@@ -1,6 +1,6 @@
-// Balance bot: plays every chapter-1 level many times and reports win rate,
+// Balance bot: plays every level many times and reports win rate,
 // moves used and scam interrupts seen. Run: npx vite-node scripts/bot.ts
-import { CHAPTER1 } from "../src/content/levels"
+import { LEVELS } from "../src/content/levels"
 import { isTile } from "../src/logic/cells"
 import { addFakes, addMoves, applyMove, applyPolice, startLevel, starsFor, type LevelState } from "../src/logic/level"
 import { makeRng } from "../src/logic/rng"
@@ -18,7 +18,7 @@ function moves(s: LevelState) {
 
 function play(defIndex: number, seed: number, mode: Mode, accuracy: number) {
   const rng = makeRng(seed * 7919 + 13)
-  let s = startLevel(CHAPTER1[defIndex], seed)
+  let s = startLevel(LEVELS[defIndex], seed)
   let used = 0, interrupts = 0
   for (let guard = 0; guard < 200 && s.status === "playing"; guard++) {
     const opts = moves(s)
@@ -52,7 +52,7 @@ function play(defIndex: number, seed: number, mode: Mode, accuracy: number) {
 const N = Number(process.argv[2] ?? 30)
 for (const [mode, acc] of [["greedy", 0.75], ["random", 0.6]] as [Mode, number][]) {
   console.log(`\n== ${mode} (scam accuracy ${acc}) ==`)
-  CHAPTER1.forEach((def, k) => {
+  LEVELS.forEach((def, k) => {
     const runs = Array.from({ length: N }, (_, n) => play(k, n + 1, mode, acc))
     const wins = runs.filter((r) => r.won)
     const avg = (f: (r: typeof runs[0]) => number, rs = runs) => (rs.reduce((a, r) => a + f(r), 0) / Math.max(1, rs.length)).toFixed(1)
