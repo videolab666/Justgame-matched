@@ -14,7 +14,7 @@ export type Step = {
   clearedKinds: Kind[]                               // kind of each cleared cell, same order
   created: { index: number; special: Special; kind: Kind; id: number }[]
   fired: { index: number; special: Special; area: number[] }[]
-  fakesHit: { index: number; destroyed: boolean }[]
+  fakesHit: { index: number; destroyed: boolean; revealed?: boolean }[]
   moved: Record<number, number>
   added: Record<number, Cell>
 }
@@ -161,6 +161,11 @@ function step(w: Work, rng: Rng, rules: Rules, pending: Fire[], swapCells: numbe
   for (const i of [...hit].sort((a, b) => a - b)) {
     const x = cells[i]
     if (!isFake(x)) continue
+    if (x.fake === "forgery" && !x.revealed) {
+      cells[i] = { ...x, revealed: true }
+      fakesHit.push({ index: i, destroyed: false, revealed: true })
+      continue
+    }
     const hp = x.hp - 1
     if (hp <= 0) { cells[i] = null; fakesHit.push({ index: i, destroyed: true }) }
     else { cells[i] = { ...x, hp }; fakesHit.push({ index: i, destroyed: false }) }

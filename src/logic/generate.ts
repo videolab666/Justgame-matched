@@ -36,7 +36,11 @@ export function generateBoard(g: Grid, rng: Rng, fakes: FakeSeed[]): Board {
   for (let attempt = 0; ; attempt++) {
     let nextId = 1
     const cells: (Cell | null)[] = Array(g.w * g.h).fill(null)
-    for (const f of fakes) cells[f.index] = { t: "fake", fake: f.fake, hp: f.hp, id: nextId++ }
+    for (const f of fakes) {
+      cells[f.index] = f.fake === "forgery"
+        ? { t: "fake", fake: "forgery", hp: f.hp, id: nextId++, disguise: rng.int(KINDS) as Kind, revealed: false }
+        : { t: "fake", fake: f.fake, hp: f.hp, id: nextId++ }
+    }
     for (let i = 0; i < cells.length; i++) {
       if (cells[i]) continue
       cells[i] = { t: "tile", kind: safeKind(g, cells, i, rng), id: nextId++ }

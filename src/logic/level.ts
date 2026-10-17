@@ -1,6 +1,6 @@
 import type { ScamCategory } from "../content/types"
 import { FAKE_HP, isFake, isTile, type FakeType, type Kind } from "./cells"
-import { spreadFake } from "./fakes"
+import { hopCalls, spreadFake } from "./fakes"
 import { generateBoard, hasValidMove, shuffleBoard, type FakeSeed } from "./generate"
 import type { Grid } from "./grid"
 import { fireSpecialAt, resolveSwap, type Board, type Rules, type Step } from "./resolve"
@@ -37,6 +37,7 @@ export type MoveResult = {
   state: LevelState
   steps: Step[]
   infected?: { from: number; to: number }
+  hops?: { from: number; to: number }[]
   shuffled?: Record<number, number>
   interruptDue: boolean
 }
@@ -98,6 +99,12 @@ export function applyMove(s: LevelState, a: number, b: number): MoveResult {
     state = { ...state, board: spread.board }
     infected = spread.infected
   }
+  let hops: MoveResult["hops"]
+  if (!goalsDone(state) && state.board.cells.some((c) => isFake(c) && c.fake === "call")) {
+    const h = hopCalls(state.board, rng)
+    state = { ...state, board: h.board }
+    if (h.hops.length) hops = h.hops
+  }
   let shuffled: MoveResult["shuffled"]
   if (!hasValidMove(state.board)) {
     const sh = shuffleBoard(state.board, rng)
@@ -106,7 +113,7 @@ export function applyMove(s: LevelState, a: number, b: number): MoveResult {
   }
   state = finish({ ...state, rngState: rng.state() })
   const interruptDue = state.status === "playing" && s.def.interruptEvery > 0 && state.moveCount % s.def.interruptEvery === 0
-  return { state, steps, infected, shuffled, interruptDue }
+  return { state, steps, infected, hops, shuffled, interruptDue }
 }
 
 /** «Кіберполіція» booster: turns the tile at `index` into a police special
@@ -134,7 +141,10 @@ export function addFakes(s: LevelState, n: number): { state: LevelState; infecte
   const infected: number[] = []
   for (let k = 0; k < n && plain.length; k++) {
     const i = plain.splice(rng.int(plain.length), 1)[0]
-    cells[i] = { t: "fake", fake: type, hp: FAKE_HP[type], id: nextId++ }
+    const victim = cells[i]
+    cells[i] = type === "forgery" && isTile(victim)
+      ? { t: "fake", fake: "forgery", hp: FAKE_HP.forgery, id: nextId++, disguise: victim.kind, revealed: false }
+      : { t: "fake", fake: type, hp: FAKE_HP[type], id: nextId++ }
     infected.push(i)
   }
   return { state: { ...s, board: { ...s.board, cells, nextId }, rngState: rng.state() }, infected }
