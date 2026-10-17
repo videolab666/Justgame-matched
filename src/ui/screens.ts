@@ -4,6 +4,7 @@ import { KIND_NAMES } from "../logic/cells"
 import type { LevelDef } from "../logic/level"
 import { svgUrl } from "../render/textures"
 import type { SaveData } from "../save"
+import { fakeIcon } from "./icons"
 import { el, esc, highlight } from "./text"
 
 const chek = () => `<img class="chek" src="${svgUrl("chek")}" alt="Пес Чек">`
@@ -32,35 +33,51 @@ export function showStart(root: HTMLElement): Promise<Audience> {
   })
 }
 
-export type MapChoice = { kind: "level"; id: string } | { kind: "settings" }
+export type MapChoice = { kind: "level"; id: string } | { kind: "settings" } | { kind: "chapter"; ci: number } | { kind: "refresh" }
+export type Chapter = { n: number; title: string; levels: LevelDef[] }
 
-export function showMap(root: HTMLElement, save: SaveData, levels: LevelDef[]): Promise<MapChoice> {
-  const open = (k: number) => save.allOpen || k === 0 || (save.stars[levels[k - 1].id] ?? 0) > 0
-  const next = levels.findIndex((l, k) => open(k) && !save.stars[l.id])
-  const total = levels.reduce((a, l) => a + (save.stars[l.id] ?? 0), 0)
+/** One chapter at a time; levels open in global order (previous level has a star). */
+export function showMap(root: HTMLElement, save: SaveData, chapters: Chapter[], ci: number): Promise<MapChoice> {
+  const all = chapters.flatMap((c) => c.levels)
+  const open = (id: string) => {
+    const g = all.findIndex((l) => l.id === id)
+    return save.allOpen || g === 0 || (save.stars[all[g - 1].id] ?? 0) > 0
+  }
+  const ch = chapters[ci]
+  const levels = ch.levels
+  const next = levels.findIndex((l) => open(l.id) && !save.stars[l.id])
+  const total = all.reduce((a, l) => a + (save.stars[l.id] ?? 0), 0)
   const tiles = levels.map((l, k) => {
     const st = save.stars[l.id] ?? 0
-    const cls = !open(k) ? "locked" : k === next ? "next" : ""
-    return `<button class="lvl ${cls}" data-k="${k}" ${open(k) ? "" : "disabled"}>${open(k) ? k + 1 : "🔒"}<small>${open(k) ? "★".repeat(st) + "☆".repeat(3 - st) : ""}</small></button>`
+    const ok = open(l.id)
+    const cls = !ok ? "locked" : k === next ? "next" : ""
+    return `<button class="lvl ${cls}" data-k="${k}" ${ok ? "" : "disabled"}>${ok ? k + 1 : "🔒"}<small>${ok ? "★".repeat(st) + "☆".repeat(3 - st) : ""}</small></button>`
   }).join("")
+  const chapterOpen = open(levels[0].id)
+  const say = !chapterOpen ? "Цей розділ відкриється, коли пройдеш попередній."
+    : next >= 0 ? esc(levels[next].hint) : "Розділ пройдено! Спробуй зібрати всі зірки або йди далі."
   return screen(root, `
-    <h2>Розділ 1 · Банк</h2>
-    <p>⭐ ${total} / ${levels.length * 3}</p>
+    <div class="chapter-nav"><button class="arrow" data-prev ${ci === 0 ? "disabled" : ""}>‹</button>
+      <div><small>Розділ ${ch.n} з ${chapters.length}</small><h2>${esc(ch.title)}</h2></div>
+      <button class="arrow" data-next ${ci === chapters.length - 1 ? "disabled" : ""}>›</button></div>
+    <p>⭐ ${total} / ${all.length * 3}</p>
     <div class="map">${tiles}</div>
     ${chek()}
-    <div class="say">${next >= 0 ? esc(levels[next].hint) : "Розділ пройдено! Спробуй зібрати всі зірки."}</div>
+    <div class="say">${say}</div>
     <div class="row">${save.allOpen ? "" : `<button class="link" data-open>Відкрити всі рівні</button>`}<button class="link" data-settings>⚙️ Налаштування</button></div>`,
   (s, done) => {
     s.querySelectorAll<HTMLButtonElement>(".lvl:not(.locked)").forEach((b) => (b.onclick = () => done({ kind: "level", id: levels[Number(b.dataset.k)].id })))
     const o = s.querySelector<HTMLButtonElement>("[data-open]")
-    if (o) o.onclick = () => { save.allOpen = true; done({ kind: "settings" }) }
+    if (o) o.onclick = () => { save.allOpen = true; done({ kind: "refresh" }) }
     s.querySelector<HTMLButtonElement>("[data-settings]")!.onclick = () => done({ kind: "settings" })
+    s.querySelector<HTMLButtonElement>("[data-prev]")!.onclick = () => done({ kind: "chapter", ci: ci - 1 })
+    s.querySelector<HTMLButtonElement>("[data-next]")!.onclick = () => done({ kind: "chapter", ci: ci + 1 })
   })
 }
 
 export function showIntro(root: HTMLElement, def: LevelDef): Promise<void> {
   const goals = def.goals.map((g) => {
-    const icon = g.type === "fakes" ? "fake-sms" : KIND_NAMES[g.kind]
+    const icon = g.type === "fakes" ? fakeIcon(def) : KIND_NAMES[g.kind]
     const label = g.type === "fakes" ? "погасити фейки" : "зібрати"
     return `<div class="goal"><img src="${svgUrl(icon)}" alt=""><span>${g.n}</span></div><small style="color:var(--muted)">${label}</small>`
   }).join("")

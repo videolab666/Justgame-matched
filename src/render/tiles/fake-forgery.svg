@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"><defs>
+<linearGradient id="p" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff6e8"/><stop offset="1" stop-color="#d9c3a5"/></linearGradient></defs>
+<path d="M28 14h52l22 22v76a8 8 0 0 1-8 8H28a8 8 0 0 1-8-8V22a8 8 0 0 1 8-8z" fill="#4a3320" transform="translate(2 4)"/>
+<path d="M28 10h52l22 22v76a8 8 0 0 1-8 8H28a8 8 0 0 1-8-8V18a8 8 0 0 1 8-8z" fill="url(#p)" stroke="#4a3320" stroke-width="4" stroke-linejoin="round"/>
+<path d="M80 10v22h22" fill="#e8d5b8" stroke="#4a3320" stroke-width="4" stroke-linejoin="round"/>
+<rect x="34" y="34" width="34" height="6" rx="3" fill="#9c8670"/><rect x="34" y="48" width="56" height="6" rx="3" fill="#9c8670"/><rect x="34" y="62" width="48" height="6" rx="3" fill="#9c8670"/>
+<g transform="rotate(-16 64 88)"><rect x="18" y="72" width="92" height="30" rx="6" fill="none" stroke="#e3263c" stroke-width="5"/>
+<text x="64" y="94" font-family="Arial Black,Arial,sans-serif" font-weight="900" font-size="17" fill="#e3263c" text-anchor="middle">ПІДРОБКА</text></g>
+<path d="M12 70h104" stroke="#00f0ff" stroke-width="4" opacity=".55"/><path d="M8 90h70" stroke="#ff3bd4" stroke-width="3" opacity=".5"/>
+</svg>

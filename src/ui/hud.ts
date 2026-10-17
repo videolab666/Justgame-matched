@@ -1,6 +1,7 @@
 import { KIND_NAMES } from "../logic/cells"
 import type { LevelState } from "../logic/level"
 import { svgUrl } from "../render/textures"
+import { fakeIcon } from "./icons"
 import { el, esc } from "./text"
 
 /** Top bar: moves, goals (remaining counts), score bar with star marks. */
@@ -15,6 +16,7 @@ export function mountHud(root: HTMLElement, onSettings: () => void) {
   root.append(hud, gear)
   const q = <T extends Element>(s: string) => hud.querySelector(s) as T
   let last: number[] = []
+  let levelId = ""
   return {
     update(s: LevelState) {
       q<HTMLElement>(".moves b").textContent = String(s.movesLeft)
@@ -22,9 +24,10 @@ export function mountHud(root: HTMLElement, onSettings: () => void) {
       q<HTMLElement>(".title").textContent = `${s.def.id} · ${s.def.title}`
       q<HTMLElement>(".score span").textContent = String(s.score)
       const goals = q<HTMLElement>(".goals")
-      if (goals.children.length !== s.def.goals.length) {
+      if (levelId !== s.def.id) {
+        levelId = s.def.id
         goals.innerHTML = s.def.goals.map((g) => {
-          const icon = g.type === "fakes" ? "fake-sms" : KIND_NAMES[g.kind]
+          const icon = g.type === "fakes" ? fakeIcon(s.def) : KIND_NAMES[g.kind]
           return `<div class="goal"><img src="${svgUrl(icon)}" alt=""><span></span></div>`
         }).join("")
         last = []

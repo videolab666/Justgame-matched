@@ -113,6 +113,20 @@ export class BoardEffects implements BoardFx {
     sfx.fake()
   }
 
+  reveal(x: number, y: number) {
+    this.bursts.burst(x, y, 0x00f0ff, 1.2)
+    ring(this.layer, x, y, 0xff3bd4, this.view.cell * 1.1, 6)
+    popText(this.layer, "Підробка!", x, y - this.view.cell * 0.6, 24, "#ff7ad9")
+    this.glitch(0.25, 10)
+    sfx.fake()
+  }
+
+  combo(x: number, y: number) {
+    popText(this.layer, "Супер-комбо!", Math.min(Math.max(x, 110), this.view.cell * 7 - 110), y, 38)
+    slowMo(0.5)
+    shake(this.shakeTarget, 14)
+  }
+
   confetti() {
     const s = this.screen()
     this.bursts.confetti(this.view.cell * 7, [0xff3b5c, 0xffe600, 0x3bff9a, 0x3bc8ff, 0xc03bff])

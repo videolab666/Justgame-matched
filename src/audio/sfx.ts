@@ -69,5 +69,6 @@ export const sfx = {
   bad() { tone("sawtooth", 300, 110, 0.4, 0.2); noise(0.3, 0.15, 800, 200, 1) },
   win() { [523, 659, 784, 1047, 1319].forEach((f, k) => tone("triangle", f, f * 1.01, 0.22, 0.28, k * 0.09)) },
   whoosh() { noise(0.28, 0.2, 300, 3000, 0.9) },
+  ring() { [0, 0.12].forEach((d) => { tone("square", 1180, 1180, 0.07, 0.07, d); tone("square", 940, 940, 0.07, 0.05, d + 0.04) }) },
   tick() { tone("sine", 1400, 1400, 0.03, 0.08) },
 }

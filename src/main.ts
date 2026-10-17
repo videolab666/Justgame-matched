@@ -2,7 +2,7 @@ import { gsap } from "gsap"
 import { Application, Container, FillGradient, Graphics } from "pixi.js"
 import { sfx } from "./audio/sfx"
 import { pickScam } from "./content/deck"
-import { CHAPTER1 } from "./content/levels"
+import { CHAPTERS, LEVELS } from "./content/levels"
 import type { Scam } from "./content/types"
 import { BoardEffects } from "./fx/board-fx"
 import { popText, setRest } from "./fx/juice"
@@ -141,6 +141,7 @@ async function boot() {
     await view.play(a, b, r.steps, { infected: r.infected, shuffled: r.shuffled })
     state = r.state
     await view.setBoard(state.board, true)
+    if (r.hops) sfx.ring()
     hud.update(state)
     if (r.interruptDue) await interrupt()
     else checkEnd()
@@ -150,8 +151,12 @@ async function boot() {
   // Debug handle for automated checks (state is read-only from outside).
   ;(window as unknown as { __nv: unknown }).__nv = { get state() { return state }, get answers() { return answers }, view, fx, interrupt }
   if (!save.audience) { save.audience = await showStart(ui); writeSave(save) }
+  const chapterOf = (id: string) => CHAPTERS.findIndex((c) => c.levels.some((l) => l.id === id))
+  let ci = Math.max(0, chapterOf((LEVELS.find((l) => !save.stars[l.id]) ?? LEVELS[LEVELS.length - 1]).id))
   for (;;) {
-    const choice = await showMap(ui, save, CHAPTER1)
+    const choice = await showMap(ui, save, CHAPTERS, ci)
+    if (choice.kind === "refresh") { writeSave(save); continue }
+    if (choice.kind === "chapter") { ci = Math.min(CHAPTERS.length - 1, Math.max(0, choice.ci)); continue }
     if (choice.kind === "settings") {
       writeSave(save)
       const r = await showSettings(ui, save, false)
@@ -159,9 +164,10 @@ async function boot() {
       if (r === "audience") { save.audience = await showStart(ui); writeSave(save) }
       continue
     }
-    let k = CHAPTER1.findIndex((l) => l.id === choice.id)
-    while (k >= 0 && k < CHAPTER1.length) {
-      const def = CHAPTER1[k]
+    let k = LEVELS.findIndex((l) => l.id === choice.id)
+    while (k >= 0 && k < LEVELS.length) {
+      const def = LEVELS[k]
+      ci = chapterOf(def.id)
       await showIntro(ui, def)
       const outcome = await playLevel(def)
       if (outcome === "quit") break
@@ -174,7 +180,7 @@ async function boot() {
         fx.confetti()
         await wait(1100)
       } else await wait(500)
-      const c = await showResult(ui, { won, stars, score: state.score, hasNext: k + 1 < CHAPTER1.length, answers })
+      const c = await showResult(ui, { won, stars, score: state.score, hasNext: k + 1 < LEVELS.length, answers })
       if (c === "map") break
       if (c === "next") k++
     }

@@ -12,14 +12,17 @@ export type BoardFx = {
   fakeHit(x: number, y: number, destroyed: boolean): void
   step(cascade: number, cleared: number, x: number, y: number): void
   infect(x: number, y: number): void
+  reveal(x: number, y: number): void
+  combo(x: number, y: number): void
 }
-const NO_FX: BoardFx = { pop() {}, blast() {}, fakeHit() {}, step() {}, infect() {} }
+const NO_FX: BoardFx = { pop() {}, blast() {}, fakeHit() {}, step() {}, infect() {}, reveal() {}, combo() {} }
 
 const OVERLAY: Record<string, string> = { row: "fx-row", col: "fx-col", notify: "fx-notify", kep: "fx-kep", police: "fx-police" }
 
 class TileSprite extends Container {
   base: Sprite
   overlay?: Sprite
+  wobble?: gsap.core.Tween
   constructor(private tex: Record<string, Texture>, public cell: Cell, size: number) {
     super()
     this.base = new Sprite(this.textureFor(cell))
@@ -28,14 +31,21 @@ class TileSprite extends Container {
     this.setCell(cell, size)
   }
   textureFor(c: Cell): Texture {
-    return isFake(c) ? this.tex["fake-sms"] : this.tex[c.special === "kep" ? "fx-kep" : TILE_TEXTURES[c.kind]]
+    if (isFake(c)) {
+      if (c.fake === "ad") return this.tex[c.hp > 1 ? "fake-ad" : "fake-ad-cracked"]
+      if (c.fake === "call") return this.tex["fake-call"]
+      if (c.fake === "forgery") return c.revealed ? this.tex["fake-forgery"] : this.tex[TILE_TEXTURES[c.disguise ?? 0]]
+      return this.tex["fake-sms"]
+    }
+    return this.tex[c.special === "kep" ? "fx-kep" : TILE_TEXTURES[c.kind]]
   }
   setCell(c: Cell, size: number) {
     this.cell = c
     this.base.texture = this.textureFor(c)
     const s = size * 0.86
     this.base.width = this.base.height = s
-    const name = isTile(c) && c.special && c.special !== "kep" ? OVERLAY[c.special] : undefined
+    const masked = isFake(c) && c.fake === "forgery" && !c.revealed
+    const name = masked ? "fx-mask" : isTile(c) && c.special && c.special !== "kep" ? OVERLAY[c.special] : undefined
     if (name && !this.overlay) {
       this.overlay = new Sprite(this.tex[name])
       this.overlay.anchor.set(0.5)
@@ -45,7 +55,10 @@ class TileSprite extends Container {
       this.overlay.visible = !!name
       if (name) { this.overlay.texture = this.tex[name]; this.overlay.width = this.overlay.height = size * 0.98 }
     }
-    this.base.tint = isFake(c) && c.hp > 1 ? 0xffb3e6 : 0xffffff
+    // A call rings: a gentle wobble that stops once the cell is something else.
+    const ringing = isFake(c) && c.fake === "call"
+    if (ringing && !this.wobble) this.wobble = gsap.to(this.base, { rotation: 0.14, duration: 0.09, yoyo: true, repeat: -1, repeatDelay: 0.6, ease: "sine.inOut" })
+    if (!ringing && this.wobble) { this.wobble.kill(); this.wobble = undefined; this.base.rotation = 0 }
   }
 }
 
@@ -226,7 +239,11 @@ export class BoardView extends Container {
       s.setCell(next, this.cell)
       gsap.fromTo(s.scale, { x: 1.6, y: 1.6 }, { x: 1, y: 1, duration: 0.35, ease: "elastic.out(1, 0.5)" })
     }
-    // 2. specials fire
+    // 2. specials fire (two swapped specials = a combo)
+    if (k === 0 && !st.matched.length && st.fired.length >= 2) {
+      const p = this.pos(st.fired[0].index)
+      this.fx.combo(p.x, p.y)
+    }
     for (const f of st.fired) {
       const p = this.pos(f.index)
       this.fx.blast(f.special, p.x, p.y, f.area.map((i) => this.pos(i)))
@@ -260,8 +277,15 @@ export class BoardView extends Container {
         gsap.to(s.scale, { x: 1.5, y: 0, duration: 0.18, ease: "power3.in" })
       } else {
         const cell = this.cells[h.index]
-        if (isFake(cell)) { const next = { ...cell, hp: cell.hp - 1 }; this.cells[h.index] = next; s.setCell(next, this.cell) }
-        gsap.fromTo(s, { x: p.x - 6 }, { x: p.x, duration: 0.25, ease: "elastic.out(1, 0.3)" })
+        if (isFake(cell)) {
+          const next = h.revealed ? { ...cell, revealed: true } : { ...cell, hp: cell.hp - 1 }
+          this.cells[h.index] = next
+          s.setCell(next, this.cell)
+        }
+        if (h.revealed) {
+          this.fx.reveal(p.x, p.y)
+          gsap.fromTo(s.scale, { x: 1.45, y: 1.45 }, { x: 1, y: 1, duration: 0.45, ease: "elastic.out(1, 0.4)" })
+        } else gsap.fromTo(s, { x: p.x - 6 }, { x: p.x, duration: 0.25, ease: "elastic.out(1, 0.3)" })
       }
     }
     await Promise.all(pops)
