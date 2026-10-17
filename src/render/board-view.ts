@@ -76,6 +76,13 @@ export class BoardView extends Container {
     this.on("pointerupoutside", () => (this.press = null))
   }
 
+  /** Sprites currently showing fakes (for idle glitch effects). */
+  fakeSprites(): Container[] {
+    const out: Container[] = []
+    for (const c of this.cells) if (isFake(c)) { const s = this.sprites.get(c.id); if (s) out.push(s) }
+    return out
+  }
+
   /** Cell centre in board-local pixels. */
   pos(i: number) {
     const { r, c } = rc(this.g, i)
