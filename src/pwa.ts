@@ -11,7 +11,10 @@ addEventListener("beforeinstallprompt", (e) => {
 
 export function registerSW() {
   if (!import.meta.env.PROD || !("serviceWorker" in navigator)) return
-  addEventListener("load", () => { navigator.serviceWorker.register("./sw.js").catch(() => {}) })
+  const go = () => { navigator.serviceWorker.register("./sw.js").catch(() => {}) }
+  // Called after async boot: "load" may already have fired.
+  if (document.readyState === "complete") go()
+  else addEventListener("load", go, { once: true })
 }
 
 const standalone = () => matchMedia("(display-mode: standalone)").matches || (navigator as unknown as { standalone?: boolean }).standalone === true
