@@ -23,6 +23,8 @@ export type LevelDef = {
   specials: ("row" | "col" | "notify" | "kep")[]
   /** Swapping two specials fires a combo (chapter 4). */
   combos?: boolean
+  /** Seconds for a timed round («Справа дня»); moves are then unlimited. */
+  timeLimit?: number
   hint: string
 }
 export type LevelState = {

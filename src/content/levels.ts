@@ -38,7 +38,7 @@ export const CHAPTER1: LevelDef[] = [
 // string picks the type per fake: s = sms, a = ad (2 hits), c = call, f = forgery.
 const SPACED: [number, number][] = [[0, 1], [3, 4], [6, 1], [2, 6], [5, 3], [1, 3], [4, 0], [7, 6], [3, 2], [0, 5], [6, 5], [2, 0], [4, 6], [7, 0], [7, 3]]
 const TYPE = { s: ["sms", 1], a: ["ad", 2], c: ["call", 1], f: ["forgery", 1] } as const
-function fakes(pattern: string, shift = 0) {
+export function fakes(pattern: string, shift = 0) {
   return [...pattern].map((ch, k) => {
     const [r, c] = SPACED[(k + shift) % SPACED.length]
     const [fake, hp] = TYPE[ch as keyof typeof TYPE]
