@@ -11,6 +11,7 @@ export type Rules = { specials: Set<"row" | "col" | "notify" | "kep"> }
 export type Step = {
   matched: MatchGroup[]
   cleared: number[]
+  clearedKinds: Kind[]                               // kind of each cleared cell, same order
   created: { index: number; special: Special; kind: Kind; id: number }[]
   fired: { index: number; special: Special; area: number[] }[]
   fakesHit: { index: number; destroyed: boolean }[]
@@ -166,9 +167,10 @@ function step(w: Work, rng: Rng, rules: Rules, pending: Fire[], swapCells: numbe
   }
 
   const cleared = [...clear].filter((i) => !protect.has(i) && isTile(cells[i])).sort((a, b) => a - b)
+  const clearedKinds = cleared.map((i) => (cells[i] as TileCell).kind)
   for (const i of cleared) cells[i] = null
   const { moved, added } = settle(w, rng)
-  return { matched, cleared, created, fired, fakesHit, moved, added }
+  return { matched, cleared, clearedKinds, created, fired, fakesHit, moved, added }
 }
 
 function cascade(w: Work, rng: Rng, rules: Rules, first: Fire[], swapCells: number[]): Step[] {
