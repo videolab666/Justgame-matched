@@ -33,11 +33,11 @@ export function showStart(root: HTMLElement): Promise<Audience> {
   })
 }
 
-export type MapChoice = { kind: "level"; id: string } | { kind: "settings" } | { kind: "chapter"; ci: number } | { kind: "refresh" }
+export type MapChoice = { kind: "level"; id: string } | { kind: "settings" } | { kind: "chapter"; ci: number } | { kind: "refresh" } | { kind: "daily" } | { kind: "install" }
 export type Chapter = { n: number; title: string; levels: LevelDef[] }
 
 /** One chapter at a time; levels open in global order (previous level has a star). */
-export function showMap(root: HTMLElement, save: SaveData, chapters: Chapter[], ci: number): Promise<MapChoice> {
+export function showMap(root: HTMLElement, save: SaveData, chapters: Chapter[], ci: number, extra: { key: string; install: string }): Promise<MapChoice> {
   const all = chapters.flatMap((c) => c.levels)
   const open = (id: string) => {
     const g = all.findIndex((l) => l.id === id)
@@ -56,7 +56,13 @@ export function showMap(root: HTMLElement, save: SaveData, chapters: Chapter[], 
   const chapterOpen = open(levels[0].id)
   const say = !chapterOpen ? "Цей розділ відкриється, коли пройдеш попередній."
     : next >= 0 ? esc(levels[next].hint) : "Розділ пройдено! Спробуй зібрати всі зірки або йди далі."
+  const best = save.daily.key === extra.key ? save.daily.best : 0
+  const daily = `<button class="big gold daily" data-daily>📅 Справа дня · 60 секунд
+    <small>${best ? `Твій рекорд сьогодні: ${best}` : "Нове поле щодня — однакове для всіх"}${save.streak.count ? ` · 🔥 ${save.streak.count}` : ""}</small></button>`
+  const install = extra.install === "prompt" ? `<button class="link" data-install>📲 Встановити гру</button>`
+    : extra.install === "ios" ? `<span class="hint-ios">📲 Встановити: «Поділитися» → «На початковий екран»</span>` : ""
   return screen(root, `
+    ${daily}
     <div class="chapter-nav"><button class="arrow" data-prev ${ci === 0 ? "disabled" : ""}>‹</button>
       <div><small>Розділ ${ch.n} з ${chapters.length}</small><h2>${esc(ch.title)}</h2></div>
       <button class="arrow" data-next ${ci === chapters.length - 1 ? "disabled" : ""}>›</button></div>
@@ -64,12 +70,15 @@ export function showMap(root: HTMLElement, save: SaveData, chapters: Chapter[], 
     <div class="map">${tiles}</div>
     ${chek()}
     <div class="say">${say}</div>
-    <div class="row">${save.allOpen ? "" : `<button class="link" data-open>Відкрити всі рівні</button>`}<button class="link" data-settings>⚙️ Налаштування</button></div>`,
+    <div class="row">${save.allOpen ? "" : `<button class="link" data-open>Відкрити всі рівні</button>`}<button class="link" data-settings>⚙️ Налаштування</button>${install}</div>`,
   (s, done) => {
     s.querySelectorAll<HTMLButtonElement>(".lvl:not(.locked)").forEach((b) => (b.onclick = () => done({ kind: "level", id: levels[Number(b.dataset.k)].id })))
     const o = s.querySelector<HTMLButtonElement>("[data-open]")
     if (o) o.onclick = () => { save.allOpen = true; done({ kind: "refresh" }) }
     s.querySelector<HTMLButtonElement>("[data-settings]")!.onclick = () => done({ kind: "settings" })
+    s.querySelector<HTMLButtonElement>("[data-daily]")!.onclick = () => done({ kind: "daily" })
+    const ins = s.querySelector<HTMLButtonElement>("[data-install]")
+    if (ins) ins.onclick = () => done({ kind: "install" })
     s.querySelector<HTMLButtonElement>("[data-prev]")!.onclick = () => done({ kind: "chapter", ci: ci - 1 })
     s.querySelector<HTMLButtonElement>("[data-next]")!.onclick = () => done({ kind: "chapter", ci: ci + 1 })
   })
@@ -82,7 +91,7 @@ export function showIntro(root: HTMLElement, def: LevelDef): Promise<void> {
     return `<div class="goal"><img src="${svgUrl(icon)}" alt=""><span>${g.n}</span></div><small style="color:var(--muted)">${label}</small>`
   }).join("")
   return screen(root, `
-    <h2>${esc(def.id)} · ${esc(def.title)}</h2>
+    <h2>${def.id === "daily" ? "📅 " + esc(def.title) : esc(def.id) + " · " + esc(def.title)}</h2>
     <div class="row" style="align-items:center">${goals}</div>
     <p>За ${def.moves} ходів</p>
     ${chek()}
@@ -110,6 +119,37 @@ export function showResult(root: HTMLElement, r: { won: boolean; stars: number; 
     <button class="link" data-c="map">До карти</button>
     ${review ? `<h2>Що це було?</h2><div class="review">${review}</div>` : ""}`, (s, done) => {
     s.querySelectorAll<HTMLButtonElement>("[data-c]").forEach((b) => (b.onclick = () => done(b.dataset.c as ResultChoice)))
+  })
+}
+
+/** Daily result with a share card (share sheet, or copy to clipboard). */
+export function showDailyResult(root: HTMLElement, r: { score: number; fakes: number; best: number; record: boolean; streak: number; text: string; answers: ReviewItem[] }): Promise<"retry" | "map"> {
+  const review = r.answers.map((a) => {
+    const verdict = a.answer === "timeout" ? "⏰ Не встиг" : a.correct ? "✓ Правильно" : "✗ Помилка"
+    return `<div class="item"><span class="tag ${a.correct ? "ok" : "no"}">${verdict} · ${a.scam.isFake ? "ФЕЙК" : "СПРАВЖНЄ"}</span>
+      <q>${highlight(a.scam.text, a.scam.flags)}</q><div class="why">${esc(a.scam.explain)}</div></div>`
+  }).join("")
+  return screen(root, `
+    <h1>Справа дня</h1>
+    <div class="share-card"><div class="big-num">${r.score}</div><small>очок${r.record ? " · новий рекорд!" : ""}</small>
+      <div class="row"><span>🛡️ ${r.fakes} фейків</span><span>🔥 серія ${r.streak}</span><span>🏆 ${r.best}</span></div>
+      <div class="dots">${r.answers.map((a) => (a.correct ? "✅" : "❌")).join("")}</div></div>
+    <button class="big gold" data-share>📤 Поділитися</button>
+    <div class="row"><button class="big alt" data-c="retry">↻ Ще раз</button></div>
+    <button class="link" data-c="map">До карти</button>
+    ${review ? `<h2>Що це було?</h2><div class="review">${review}</div>` : ""}`, (s, done) => {
+    const share = s.querySelector<HTMLButtonElement>("[data-share]")!
+    share.onclick = async () => {
+      // Share sheet on phones; otherwise (or if it fails) copy the text.
+      try {
+        if (navigator.share) { await navigator.share({ text: r.text }); return }
+      } catch (e) { if ((e as Error).name === "AbortError") return }
+      try {
+        await navigator.clipboard.writeText(r.text)
+        share.textContent = "✓ Скопійовано — встав у чат!"
+      } catch { share.textContent = "Не вдалося скопіювати" }
+    }
+    s.querySelectorAll<HTMLButtonElement>("[data-c]").forEach((b) => (b.onclick = () => done(b.dataset.c as "retry" | "map")))
   })
 }
 

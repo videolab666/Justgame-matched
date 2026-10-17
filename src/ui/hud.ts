@@ -19,9 +19,11 @@ export function mountHud(root: HTMLElement, onSettings: () => void) {
   let levelId = ""
   return {
     update(s: LevelState) {
-      q<HTMLElement>(".moves b").textContent = String(s.movesLeft)
-      q<HTMLElement>(".moves").classList.toggle("low", s.movesLeft <= 4 && s.status === "playing")
-      q<HTMLElement>(".title").textContent = `${s.def.id} · ${s.def.title}`
+      const timed = !!s.def.timeLimit
+      q<HTMLElement>(".moves small").textContent = timed ? "СЕКУНД" : "ХОДИ"
+      if (!timed) q<HTMLElement>(".moves b").textContent = String(s.movesLeft)
+      q<HTMLElement>(".moves").classList.toggle("low", !timed && s.movesLeft <= 4 && s.status === "playing")
+      q<HTMLElement>(".title").textContent = s.def.id === "daily" ? `📅 ${s.def.title}` : `${s.def.id} · ${s.def.title}`
       q<HTMLElement>(".score span").textContent = String(s.score)
       const goals = q<HTMLElement>(".goals")
       if (levelId !== s.def.id) {
@@ -35,8 +37,9 @@ export function mountHud(root: HTMLElement, onSettings: () => void) {
       s.def.goals.forEach((g, k) => {
         const left = Math.max(0, g.n - s.progress[k])
         const chip = goals.children[k] as HTMLElement
-        chip.querySelector("span")!.textContent = left ? String(left) : "✓"
-        chip.classList.toggle("done", left === 0)
+        // Endless goals (daily) count up instead of down.
+        chip.querySelector("span")!.textContent = g.n >= 999 ? String(s.progress[k]) : left ? String(left) : "✓"
+        chip.classList.toggle("done", g.n < 999 && left === 0)
         if (last[k] !== undefined && last[k] !== s.progress[k]) {
           chip.classList.add("bump")
           setTimeout(() => chip.classList.remove("bump"), 180)
@@ -51,6 +54,10 @@ export function mountHud(root: HTMLElement, onSettings: () => void) {
           `<span class="star" style="left:${(v / max) * 100}%">⭐</span>`).join(""))
       }
       bar.querySelectorAll<HTMLElement>(".star").forEach((st, k) => st.classList.toggle("on", s.score >= s.def.stars[k + 1]))
+    },
+    setTime(sec: number) {
+      q<HTMLElement>(".moves b").textContent = String(sec)
+      q<HTMLElement>(".moves").classList.toggle("low", sec <= 10)
     },
     resetStars() { hud.querySelectorAll(".scorebar .star").forEach((x) => x.remove()) },
     destroy() { hud.remove(); gear.remove() },

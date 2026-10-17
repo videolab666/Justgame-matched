@@ -2,6 +2,7 @@ import { gsap } from "gsap"
 import { Application, Container, FillGradient, Graphics } from "pixi.js"
 import { sfx } from "./audio/sfx"
 import { pickScam } from "./content/deck"
+import { dailyKey, dailyLevel, shareText, updateStreak } from "./content/daily"
 import { CHAPTERS, LEVELS } from "./content/levels"
 import type { Scam } from "./content/types"
 import { BoardEffects } from "./fx/board-fx"
@@ -12,10 +13,11 @@ import { addFakes, addMoves, applyMove, applyPolice, BOARD, starsFor, startLevel
 import { makeRng } from "./logic/rng"
 import { BoardView } from "./render/board-view"
 import { loadTextures } from "./render/textures"
+import { installState, promptInstall, registerSW } from "./pwa"
 import { loadSave, writeSave } from "./save"
 import { mountHud } from "./ui/hud"
 import { showScam } from "./ui/scam-card"
-import { showIntro, showMap, showResult, showSettings, showStart } from "./ui/screens"
+import { showDailyResult, showIntro, showMap, showResult, showSettings, showStart } from "./ui/screens"
 import "./ui/styles.css"
 
 const HUD_TOP = 130
@@ -43,10 +45,18 @@ async function boot() {
   stage.addChild(view)
   const fx = new BoardEffects(view, stage, tex, () => ({ w: innerWidth, h: innerHeight }), overlay)
   view.fx = fx
+  // «Справа дня» clock: real seconds, paused while a message or settings are open.
+  const clock = { active: false, left: 0, paused: false, up: false, shown: -1 }
   app.ticker.add((t) => {
     fx.update((t.deltaMS / 1000) * gsap.globalTimeline.timeScale(), performance.now())
     quality.sample(t.deltaMS)
+    if (!clock.active || clock.paused || clock.up) return
+    clock.left = Math.max(0, clock.left - t.deltaMS / 1000)
+    const sec = Math.ceil(clock.left)
+    if (sec !== clock.shown) { clock.shown = sec; hud.setTime(sec); if (sec <= 5 && sec > 0) sfx.tick() }
+    if (clock.left <= 0) { clock.up = true; if (!view.locked) timeUp() }
   })
+  const timeUp = () => { if (endLevel) { const e = endLevel; endLevel = null; clock.active = false; e("won") } }
   addEventListener("pointerdown", () => sfx.unlock(), { once: true })
 
   const layout = () => {
@@ -82,11 +92,13 @@ async function boot() {
   const hud = mountHud(ui, async () => {
     if (view.locked) return
     view.locked = true
+    clock.paused = true
     const r = await showSettings(ui, save, true)
     applySettings()
+    clock.paused = false
     view.locked = false
     if (r === "audience") { save.audience = await showStart(ui); writeSave(save) }
-    if (r === "map" && endLevel) { const e = endLevel; endLevel = null; e("quit") }
+    if (r === "map" && endLevel) { const e = endLevel; endLevel = null; clock.active = false; e("quit") }
   })
 
   async function interrupt() {
@@ -95,8 +107,11 @@ async function boot() {
     writeSave(save)
     const scam = pick.scam
     view.locked = true
+    clock.paused = true
+    const timed = clock.active
     const r = await showScam(ui, scam, SCAM_SECONDS, (a) =>
-      a.correct ? (scam.isFake ? "🛡️ Бонус: Кіберполіція!" : "➕ +2 ходи!") : "⚠️ +2 фейки на полі")
+      a.correct ? (scam.isFake ? "🛡️ Бонус: Кіберполіція!" : timed ? "⏱️ +5 секунд!" : "➕ +2 ходи!") : "⚠️ +2 фейки на полі")
+    clock.paused = false
     answers.push({ scam, answer: r.answer, correct: r.correct })
     const mid = { x: view.cell * 3.5, y: view.cell * 4 }
     if (r.correct && scam.isFake) {
@@ -110,6 +125,9 @@ async function boot() {
       await view.playSteps(res.steps)
       state = res.state
       await view.setBoard(state.board, true)
+    } else if (r.correct && timed) {
+      clock.left += 5
+      popText(fx.layer, "+5 секунд", mid.x, mid.y, 36)
     } else if (r.correct) {
       state = addMoves(state, 2)
       popText(fx.layer, "+2 ходи", mid.x, mid.y, 36)
@@ -119,11 +137,13 @@ async function boot() {
     }
     hud.update(state)
     view.locked = false
-    checkEnd()
+    if (clock.up) timeUp()
+    else checkEnd()
   }
 
-  function playLevel(def: LevelDef): Promise<"won" | "lost" | "quit"> {
-    state = startLevel(def, Date.now() % 1_000_000)
+  function playLevel(def: LevelDef, seed = Date.now() % 1_000_000): Promise<"won" | "lost" | "quit"> {
+    state = startLevel(def, seed)
+    Object.assign(clock, { active: !!def.timeLimit, left: def.timeLimit ?? 0, paused: false, up: false, shown: -1 })
     answers = []
     hud.resetStars()
     hud.update(state)
@@ -134,7 +154,7 @@ async function boot() {
   }
 
   view.onSwap = async (a, b) => {
-    if (view.locked || state.status !== "playing") return
+    if (view.locked || state.status !== "playing" || clock.up) return
     const r = applyMove(state, a, b)
     if (!r.steps.length) { sfx.error(); await view.shakeInvalid(a, b); return }
     sfx.swap()
@@ -143,19 +163,44 @@ async function boot() {
     await view.setBoard(state.board, true)
     if (r.hops) sfx.ring()
     hud.update(state)
-    if (r.interruptDue) await interrupt()
+    if (clock.up) timeUp()
+    else if (r.interruptDue) await interrupt()
     else checkEnd()
+  }
+
+  async function playDaily() {
+    const key = dailyKey(new Date())
+    const { def, seed } = dailyLevel(key)
+    await showIntro(ui, def)
+    const outcome = await playLevel(def, seed)
+    if (outcome === "quit") return
+    view.locked = true
+    if (save.daily.key !== key) save.daily = { key, best: 0 }
+    const record = state.score > save.daily.best
+    save.daily.best = Math.max(save.daily.best, state.score)
+    save.streak = updateStreak(save.streak, key)
+    writeSave(save)
+    sfx.win()
+    fx.confetti()
+    await wait(900)
+    const fakes = state.progress[0]
+    const text = shareText({ key, score: state.score, fakes, answers: answers.map((a) => a.correct), streak: save.streak.count, url: location.origin + location.pathname })
+    const c = await showDailyResult(ui, { score: state.score, fakes, best: save.daily.best, record, streak: save.streak.count, text, answers })
+    if (c === "retry") return playDaily()
   }
 
   const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
   // Debug handle for automated checks (state is read-only from outside).
   ;(window as unknown as { __nv: unknown }).__nv = { get state() { return state }, get answers() { return answers }, view, fx, interrupt }
+  registerSW()
   if (!save.audience) { save.audience = await showStart(ui); writeSave(save) }
   const chapterOf = (id: string) => CHAPTERS.findIndex((c) => c.levels.some((l) => l.id === id))
   let ci = Math.max(0, chapterOf((LEVELS.find((l) => !save.stars[l.id]) ?? LEVELS[LEVELS.length - 1]).id))
   for (;;) {
-    const choice = await showMap(ui, save, CHAPTERS, ci)
+    const choice = await showMap(ui, save, CHAPTERS, ci, { key: dailyKey(new Date()), install: installState() })
     if (choice.kind === "refresh") { writeSave(save); continue }
+    if (choice.kind === "daily") { await playDaily(); continue }
+    if (choice.kind === "install") { await promptInstall(); continue }
     if (choice.kind === "chapter") { ci = Math.min(CHAPTERS.length - 1, Math.max(0, choice.ci)); continue }
     if (choice.kind === "settings") {
       writeSave(save)
