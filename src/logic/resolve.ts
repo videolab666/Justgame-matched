@@ -5,7 +5,8 @@ import { findMatches, type MatchGroup, type MatchShape } from "./match"
 import type { Rng } from "./rng"
 
 export type Board = { g: Grid; cells: Cell[]; nextId: number }
-export type Rules = { specials: Set<"row" | "col" | "notify" | "kep"> }
+/** `combos`: swapping two specials fires them together (chapter 4). */
+export type Rules = { specials: Set<"row" | "col" | "notify" | "kep">; combos?: boolean }
 
 /** One cascade step, in the order the renderer plays it. */
 export type Step = {
@@ -24,7 +25,7 @@ const SHAPE_SPECIAL: Partial<Record<MatchShape, "row" | "col" | "notify" | "kep"
 }
 
 type Work = { g: Grid; cells: (Cell | null)[]; nextId: number }
-type Fire = { index: number; cell: TileCell; targetKind?: Kind }
+type Fire = { index: number; cell: TileCell; targetKind?: Kind; radius?: number; area?: number[] }
 
 function swapped(b: Board, a: number, c: number): Cell[] {
   const cells = b.cells.slice()
@@ -32,10 +33,11 @@ function swapped(b: Board, a: number, c: number): Cell[] {
   return cells
 }
 
-export function isValidSwap(b: Board, a: number, c: number): boolean {
+export function isValidSwap(b: Board, a: number, c: number, rules?: Rules): boolean {
   if (!areNeighbors(b.g, a, c)) return false
   const x = b.cells[a], y = b.cells[c]
   if (!isTile(x) || !isTile(y)) return false
+  if (rules?.combos && x.special && y.special) return true
   if (x.special === "kep" || y.special === "kep") return true
   return findMatches(b.g, swapped(b, a, c)).length > 0
 }
@@ -43,13 +45,15 @@ export function isValidSwap(b: Board, a: number, c: number): boolean {
 /** Cells a special clears. Geometry only; protected cells are filtered later. */
 function areaOf(w: Work, f: Fire): number[] {
   const { g, cells } = w
+  if (f.area) return f.area
   const { r, c } = rc(g, f.index)
   switch (f.cell.special) {
     case "row": return Array.from({ length: g.w }, (_, k) => idx(g, r, k))
     case "col": return Array.from({ length: g.h }, (_, k) => idx(g, k, c))
     case "notify": {
       const out: number[] = []
-      for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+      const k = f.radius ?? 1
+      for (let dr = -k; dr <= k; dr++) for (let dc = -k; dc <= k; dc++) {
         if (inBounds(g, r + dr, c + dc)) out.push(idx(g, r + dr, c + dc))
       }
       return out
@@ -128,22 +132,24 @@ function step(w: Work, rng: Rng, rules: Rules, pending: Fire[], swapCells: numbe
     const x = cells[i]
     if (isTile(x) && x.special && !protect.has(i)) queue.push({ index: i, cell: x })
   }
-  const firedAt = new Set<number>()
+  const firedAt = new Set<string>()
   const blastHit = new Set<number>()
   while (queue.length) {
     const f = queue.shift()!
-    if (firedAt.has(f.index)) continue
-    firedAt.add(f.index)
+    // Synthetic combo fires may share a cell (cross = row + col at one cell).
+    const key = f.cell.id === -1 ? `${f.index}:${f.cell.special}:${f.radius ?? 1}` : String(f.index)
+    if (firedAt.has(key)) continue
+    firedAt.add(key)
     const area = areaOf(w, f)
     fired.push({ index: f.index, special: f.cell.special!, area })
-    clear.add(f.index)
+    if (isTile(cells[f.index])) clear.add(f.index)
     for (const i of area) {
       const x = cells[i]
       if (protect.has(i)) continue
       if (isFake(x)) { blastHit.add(i); continue }
       if (!isTile(x)) continue
       clear.add(i)
-      if (x.special && !firedAt.has(i)) queue.push({ index: i, cell: x })
+      if (x.special && !firedAt.has(String(i))) queue.push({ index: i, cell: x })
     }
   }
 
@@ -192,11 +198,51 @@ function cascade(w: Work, rng: Rng, rules: Rules, first: Fire[], swapCells: numb
 
 /** Swap two neighbours and resolve all cascades. An invalid swap returns the
  * same board and no steps. */
+/** Two swapped specials fire as one combo; returns the fires to queue. */
+function comboFires(w: Work, a: number, c: number): Fire[] {
+  const { g, cells } = w
+  const x = cells[a] as TileCell, y = cells[c] as TileCell
+  const sx = x.special!, sy = y.special!
+  // Consume both: they act through the combo, not through their own blasts.
+  cells[a] = { ...x, special: undefined }
+  cells[c] = { ...y, special: undefined }
+  const tile = (special: Special): TileCell => ({ t: "tile", kind: y.kind, special, id: -1 })
+  const { r, c: col } = rc(g, c)
+  const line = (s: Special) => s === "row" || s === "col"
+  if (sx === "kep" && sy === "kep") return [{ index: c, cell: tile("kep"), area: cells.map((_, i) => i) }]
+  if (sx === "kep" || sy === "kep") {
+    const other = sx === "kep" ? y : x
+    const special = sx === "kep" ? sy : sx
+    const fires: Fire[] = [{ index: c, cell: tile(special), area: [a, c] }]
+    cells.forEach((t, i) => {
+      if (!isTile(t) || t.special || t.kind !== other.kind || i === a || i === c) return
+      const made: TileCell = { ...t, special: special === "police" ? "notify" : special }
+      cells[i] = made
+      fires.push({ index: i, cell: made })
+    })
+    return fires
+  }
+  if (line(sx) && line(sy)) return [{ index: c, cell: tile("row") }, { index: c, cell: tile("col") }]
+  if (sx === "notify" && sy === "notify") return [{ index: c, cell: tile("notify"), radius: 2 }]
+  // line + notify: three rows and three columns through the target cell.
+  const fires: Fire[] = []
+  for (const d of [-1, 0, 1]) {
+    if (inBounds(g, r + d, col)) fires.push({ index: idx(g, r + d, col), cell: tile("row") })
+    if (inBounds(g, r, col + d)) fires.push({ index: idx(g, r, col + d), cell: tile("col") })
+  }
+  return fires
+}
+
 export function resolveSwap(b: Board, a: number, c: number, rng: Rng, rules: Rules): { board: Board; steps: Step[] } {
-  if (!isValidSwap(b, a, c)) return { board: b, steps: [] }
+  if (!isValidSwap(b, a, c, rules)) return { board: b, steps: [] }
   const w: Work = { g: b.g, cells: swapped(b, a, c), nextId: b.nextId }
   const x = w.cells[a] as TileCell, y = w.cells[c] as TileCell
   const first: Fire[] = []
+  if (rules.combos && x.special && y.special) {
+    first.push(...comboFires(w, a, c))
+    const steps = cascade(w, rng, rules, first, [])
+    return { board: { g: b.g, cells: w.cells as Cell[], nextId: w.nextId }, steps }
+  }
   // KEP swapped with a tile clears every tile of that tile's kind.
   if (x.special === "kep") first.push({ index: a, cell: x, targetKind: y.kind })
   else if (y.special === "kep") first.push({ index: c, cell: y, targetKind: x.kind })

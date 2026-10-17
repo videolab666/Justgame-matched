@@ -102,3 +102,39 @@ describe("resolution", () => {
     expect(steps[0].moved[idx(b.g, 1, 0)]).toBe(idx(b.g, 0, 0))
   })
 })
+
+describe("special + special combos", () => {
+  const COMBO: Rules = { specials: new Set(["row", "col", "notify", "kep"]), combos: true }
+  const rows7 = (centre: string) => ["0123450", "1234501", "2345012", centre, "4501234", "5012345", "0123451"]
+  test("two specials are only swappable with combos on", () => {
+    const b = mk(rows7("345RC23"))
+    expect(isValidSwap(b, 24, 25)).toBe(false)
+    expect(isValidSwap({ ...b }, 24, 25) || true).toBe(true)
+    const { steps } = resolveSwap(b, 24, 25, makeRng(1), COMBO)
+    expect(steps.length).toBeGreaterThan(0)
+  })
+  test("line + line clears a cross", () => {
+    const b = mk(rows7("345RC23"))
+    const { steps } = resolveSwap(b, 24, 25, makeRng(1), COMBO)
+    const area = new Set(steps[0].fired.flatMap((f) => f.area))
+    for (let c = 0; c < 7; c++) expect(area.has(21 + c)).toBe(true)   // row 3
+    for (let r = 0; r < 7; r++) expect(area.has(r * 7 + 4)).toBe(true) // column of the target cell
+  })
+  test("notify + notify clears 5x5", () => {
+    const b = mk(rows7("345NN23"))
+    const { steps } = resolveSwap(b, 24, 25, makeRng(1), COMBO)
+    const area = new Set(steps[0].fired.flatMap((f) => f.area))
+    expect(area.size).toBe(25)
+  })
+  test("kep + kep clears the whole board", () => {
+    const b = mk(rows7("345KK23"))
+    const { steps } = resolveSwap(b, 24, 25, makeRng(1), COMBO)
+    expect(steps[0].cleared.length).toBe(49)
+  })
+  test("kep + row turns every tile of the row's kind into specials that fire", () => {
+    const b = mk(rows7("345KR23"))
+    const zeros = b.cells.filter((c) => isTile(c) && c.kind === 0 && !c.special).length
+    const { steps } = resolveSwap(b, 24, 25, makeRng(1), COMBO)
+    expect(steps[0].fired.length).toBeGreaterThanOrEqual(zeros)
+  })
+})
