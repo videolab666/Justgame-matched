@@ -25,3 +25,9 @@ export async function loadTextures(px: number): Promise<Record<string, Texture>>
   }))
   return out
 }
+
+/** The same SVG art as a data URL, for DOM icons (HUD goals, screens). */
+export function svgUrl(name: string): string {
+  const raw = RAW[`./tiles/${name}.svg`] ?? ""
+  return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(raw)
+}
