@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"><defs>
+<radialGradient id="r" cx=".38" cy=".32" r=".8"><stop offset="0" stop-color="#ff8a8a"/><stop offset=".55" stop-color="#e3263c"/><stop offset="1" stop-color="#8a0d22"/></radialGradient>
+<linearGradient id="w" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#c98a4b"/><stop offset=".5" stop-color="#f3c387"/><stop offset="1" stop-color="#9c5d27"/></linearGradient></defs>
+<rect x="50" y="8" width="28" height="44" rx="12" fill="url(#w)" stroke="#5e3410" stroke-width="4"/>
+<rect x="38" y="48" width="52" height="16" rx="6" fill="#7b4319" stroke="#4a260a" stroke-width="4"/>
+<ellipse cx="64" cy="92" rx="46" ry="30" fill="#6d0a1a"/>
+<ellipse cx="64" cy="86" rx="46" ry="30" fill="url(#r)" stroke="#6d0a1a" stroke-width="4"/>
+<ellipse cx="64" cy="86" rx="30" ry="18" fill="none" stroke="#ffd4d4" stroke-width="4" stroke-dasharray="6 5" opacity=".9"/>
+<path d="M54 86l7 7 14-15" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M30 74q14-14 36-14" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" opacity=".5"/>
+</svg>
