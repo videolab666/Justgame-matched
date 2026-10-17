@@ -1,16 +1,16 @@
 import { describe, expect, test } from "vitest"
 import { pickScam } from "../../src/content/deck"
-import { CHAPTER1 } from "../../src/content/levels"
+import { CHAPTER1, CHAPTERS, LEVELS } from "../../src/content/levels"
 import { SCAMS } from "../../src/content/scams"
 import type { Audience } from "../../src/content/types"
 import { makeRng } from "../../src/logic/rng"
 
-const CH1_CATEGORIES = [...new Set(CHAPTER1.flatMap((l) => l.categories))]
 
 describe("levels", () => {
-  test("chapter 1 definitions are sane", () => {
-    expect(CHAPTER1).toHaveLength(6)
-    for (const l of CHAPTER1) {
+  test("all 24 level definitions are sane", () => {
+    expect(LEVELS).toHaveLength(24)
+    expect(new Set(LEVELS.map((l) => l.id)).size).toBe(24)
+    for (const l of LEVELS) {
       expect(l.moves, l.id).toBeGreaterThan(0)
       expect(l.goals.length, l.id).toBeGreaterThan(0)
       const idx = l.initialFakes.map((f) => f.index)
@@ -42,10 +42,19 @@ describe("scams", () => {
     expect(share).toBeGreaterThan(0.5)
     expect(share).toBeLessThan(0.75)
   })
-  test("every audience has at least 12 scenarios in chapter-1 categories", () => {
-    for (const a of ["self", "parents", "kids"] as Audience[]) {
-      const n = SCAMS.filter((s) => s.audience.includes(a) && CH1_CATEGORIES.includes(s.category)).length
-      expect(n, a).toBeGreaterThanOrEqual(12)
+  test("every audience has at least 12 scenarios in each chapter's categories", () => {
+    for (const ch of CHAPTERS) {
+      const cats = [...new Set(ch.levels.flatMap((l) => l.categories))]
+      for (const a of ["self", "parents", "kids"] as Audience[]) {
+        const n = SCAMS.filter((s) => s.audience.includes(a) && cats.includes(s.category)).length
+        expect(n, ch.title + "/" + a).toBeGreaterThanOrEqual(12)
+      }
+    }
+  })
+  test("each level's own pool is big enough for its messages", () => {
+    for (const l of LEVELS) for (const a of ["self", "parents", "kids"] as Audience[]) {
+      const n = SCAMS.filter((s) => s.audience.includes(a) && l.categories.includes(s.category)).length
+      expect(n, l.id + "/" + a).toBeGreaterThanOrEqual(5)
     }
   })
   test("fake messages never name real banks", () => {

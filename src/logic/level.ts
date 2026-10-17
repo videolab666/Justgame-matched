@@ -21,6 +21,8 @@ export type LevelDef = {
   categories: ScamCategory[]
   stars: [number, number, number]
   specials: ("row" | "col" | "notify" | "kep")[]
+  /** Swapping two specials fires a combo (chapter 4). */
+  combos?: boolean
   hint: string
 }
 export type LevelState = {
@@ -42,7 +44,7 @@ export type MoveResult = {
   interruptDue: boolean
 }
 
-const rulesOf = (def: LevelDef): Rules => ({ specials: new Set(def.specials) })
+const rulesOf = (def: LevelDef): Rules => ({ specials: new Set(def.specials), combos: !!def.combos })
 
 export function startLevel(def: LevelDef, seed: number): LevelState {
   const rng = makeRng(seed)
