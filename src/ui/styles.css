@@ -106,3 +106,4 @@ button { font: inherit; cursor: pointer; }
 .aud .big { display: flex; align-items: center; gap: 12px; text-align: left; }
 .aud .big span { font-size: 30px; }
 .aud .big small { display: block; font-family: var(--body); font-size: 13px; opacity: .85; }
+#ui:not(.in-level) .hud, #ui:not(.in-level) .gear { display: none; }

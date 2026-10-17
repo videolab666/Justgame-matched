@@ -3,17 +3,19 @@ import { Application, Container, FillGradient, Graphics } from "pixi.js"
 import { sfx } from "./audio/sfx"
 import { pickScam } from "./content/deck"
 import { CHAPTER1 } from "./content/levels"
-import type { Audience, Scam } from "./content/types"
+import type { Scam } from "./content/types"
 import { BoardEffects } from "./fx/board-fx"
 import { popText, setRest } from "./fx/juice"
 import { quality } from "./fx/quality"
 import { isTile } from "./logic/cells"
-import { addFakes, addMoves, applyMove, applyPolice, BOARD, startLevel, type LevelDef, type LevelState } from "./logic/level"
+import { addFakes, addMoves, applyMove, applyPolice, BOARD, starsFor, startLevel, type LevelDef, type LevelState } from "./logic/level"
 import { makeRng } from "./logic/rng"
 import { BoardView } from "./render/board-view"
 import { loadTextures } from "./render/textures"
+import { loadSave, writeSave } from "./save"
 import { mountHud } from "./ui/hud"
 import { showScam } from "./ui/scam-card"
+import { showIntro, showMap, showResult, showSettings, showStart } from "./ui/screens"
 import "./ui/styles.css"
 
 const HUD_TOP = 130
@@ -62,17 +64,35 @@ async function boot() {
   layout()
   addEventListener("resize", layout)
 
-  const hud = mountHud(ui, () => {})
-  const audience: Audience = "self"
-  let seen: string[] = []
+  const save = loadSave()
+  const osReduced = quality.reducedMotion
+  const applySettings = () => {
+    sfx.setEnabled(save.settings.sound)
+    quality.reducedMotion = osReduced || save.settings.reducedMotion
+    writeSave(save)
+  }
+  applySettings()
   const deckRng = makeRng(Date.now() % 1_000_000)
 
-  let state: LevelState
+  let state!: LevelState
   let answers: Answer[] = []
+  let endLevel: ((r: "won" | "lost" | "quit") => void) | null = null
+  const checkEnd = () => { if (state.status !== "playing" && endLevel) { const e = endLevel; endLevel = null; e(state.status === "won" ? "won" : "lost") } }
+
+  const hud = mountHud(ui, async () => {
+    if (view.locked) return
+    view.locked = true
+    const r = await showSettings(ui, save, true)
+    applySettings()
+    view.locked = false
+    if (r === "audience") { save.audience = await showStart(ui); writeSave(save) }
+    if (r === "map" && endLevel) { const e = endLevel; endLevel = null; e("quit") }
+  })
 
   async function interrupt() {
-    const pick = pickScam(seen, audience, state.def.categories, deckRng)
-    seen = pick.seen
+    const pick = pickScam(save.seen, save.audience ?? "self", state.def.categories, deckRng)
+    save.seen = pick.seen
+    writeSave(save)
     const scam = pick.scam
     view.locked = true
     const r = await showScam(ui, scam, SCAM_SECONDS, (a) =>
@@ -99,14 +119,18 @@ async function boot() {
     }
     hud.update(state)
     view.locked = false
+    checkEnd()
   }
 
-  function start(def: LevelDef) {
+  function playLevel(def: LevelDef): Promise<"won" | "lost" | "quit"> {
     state = startLevel(def, Date.now() % 1_000_000)
     answers = []
     hud.resetStars()
     hud.update(state)
     void view.setBoard(state.board)
+    view.locked = false
+    ui.classList.add("in-level")
+    return new Promise((resolve) => { endLevel = (r) => { ui.classList.remove("in-level"); resolve(r) } })
   }
 
   view.onSwap = async (a, b) => {
@@ -119,10 +143,42 @@ async function boot() {
     await view.setBoard(state.board, true)
     hud.update(state)
     if (r.interruptDue) await interrupt()
+    else checkEnd()
   }
 
-  start(CHAPTER1[0])
+  const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
+  // Debug handle for automated checks (state is read-only from outside).
   ;(window as unknown as { __nv: unknown }).__nv = { get state() { return state }, get answers() { return answers }, view, fx, interrupt }
+  if (!save.audience) { save.audience = await showStart(ui); writeSave(save) }
+  for (;;) {
+    const choice = await showMap(ui, save, CHAPTER1)
+    if (choice.kind === "settings") {
+      writeSave(save)
+      const r = await showSettings(ui, save, false)
+      applySettings()
+      if (r === "audience") { save.audience = await showStart(ui); writeSave(save) }
+      continue
+    }
+    let k = CHAPTER1.findIndex((l) => l.id === choice.id)
+    while (k >= 0 && k < CHAPTER1.length) {
+      const def = CHAPTER1[k]
+      await showIntro(ui, def)
+      const outcome = await playLevel(def)
+      if (outcome === "quit") break
+      const won = outcome === "won"
+      const stars = starsFor(def, state.score, won)
+      if (won) {
+        save.stars[def.id] = Math.max(save.stars[def.id] ?? 0, stars)
+        writeSave(save)
+        sfx.win()
+        fx.confetti()
+        await wait(1100)
+      } else await wait(500)
+      const c = await showResult(ui, { won, stars, score: state.score, hasNext: k + 1 < CHAPTER1.length, answers })
+      if (c === "map") break
+      if (c === "next") k++
+    }
+  }
 }
 
 boot()

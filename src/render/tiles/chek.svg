@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"><defs>
+<linearGradient id="fur" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffcf8a"/><stop offset="1" stop-color="#e08a3c"/></linearGradient>
+<linearGradient id="cap" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6c4bff"/><stop offset="1" stop-color="#2f1a9e"/></linearGradient>
+<linearGradient id="glass" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e9fbff"/><stop offset="1" stop-color="#7fd6ff"/></linearGradient></defs>
+<ellipse cx="64" cy="120" rx="34" ry="5" fill="#000" opacity=".25"/>
+<path d="M22 46c-10 6-14 30-6 42 6 8 16 2 18-8l4-26z" fill="#a85a22" stroke="#5a2a08" stroke-width="3.5" stroke-linejoin="round"/>
+<path d="M106 46c10 6 14 30 6 42-6 8-16 2-18-8l-4-26z" fill="#a85a22" stroke="#5a2a08" stroke-width="3.5" stroke-linejoin="round"/>
+<path d="M30 60c0-24 15-36 34-36s34 12 34 36c0 26-14 44-34 44S30 86 30 60z" fill="url(#fur)" stroke="#5a2a08" stroke-width="4"/>
+<path d="M42 78c0-12 10-18 22-18s22 6 22 18c0 14-10 22-22 22s-22-8-22-22z" fill="#fff3df"/>
+<ellipse cx="50" cy="58" rx="6.5" ry="8" fill="#fff" stroke="#3a1a05" stroke-width="2"/><ellipse cx="78" cy="58" rx="6.5" ry="8" fill="#fff" stroke="#3a1a05" stroke-width="2"/>
+<circle cx="51" cy="60" r="3.8" fill="#24123d"/><circle cx="79" cy="60" r="3.8" fill="#24123d"/><circle cx="52.4" cy="58.2" r="1.4" fill="#fff"/><circle cx="80.4" cy="58.2" r="1.4" fill="#fff"/>
+<path d="M42 46q8-5 15 0M71 46q8-5 15 0" fill="none" stroke="#5a2a08" stroke-width="3.5" stroke-linecap="round"/>
+<ellipse cx="64" cy="72" rx="8" ry="5.5" fill="#2a1406"/><ellipse cx="62" cy="70.5" rx="2.5" ry="1.4" fill="#fff" opacity=".6"/>
+<path d="M56 82q8 8 16 0" fill="none" stroke="#5a2a08" stroke-width="3.5" stroke-linecap="round"/>
+<path d="M60 84q4 8 8 0" fill="#ff6b8a" stroke="#5a2a08" stroke-width="2"/>
+<path d="M28 36c4-16 20-24 36-24s32 8 36 24c-10-4-24-6-36-6s-26 2-36 6z" fill="url(#cap)" stroke="#1a0d5e" stroke-width="3.5" stroke-linejoin="round"/>
+<path d="M24 38q40-12 80 0l-4 6q-36-10-72 0z" fill="#1a0d5e"/>
+<circle cx="64" cy="20" r="5" fill="#ffd02a" stroke="#1a0d5e" stroke-width="2.5"/>
+<g transform="rotate(-30 100 96)"><rect x="96" y="96" width="9" height="28" rx="4" fill="#7a4319" stroke="#3a1a05" stroke-width="3"/>
+<circle cx="100.5" cy="86" r="14" fill="url(#glass)" fill-opacity=".85" stroke="#2f1a9e" stroke-width="5"/>
+<path d="M93 82q4-6 10-6" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/></g>
+</svg>
