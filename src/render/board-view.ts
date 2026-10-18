@@ -4,6 +4,7 @@ import { quality } from "../fx/quality"
 import { makeGlitterTexture } from "./glitter"
 import { isFake, isTile, type Cell } from "../logic/cells"
 import { areNeighbors, rc, type Grid } from "../logic/grid"
+import { stepScore } from "../logic/level"
 import type { Board, Step } from "../logic/resolve"
 import { KIND_COLORS, TILE_TEXTURES } from "./textures"
 
@@ -16,8 +17,10 @@ export type BoardFx = {
   infect(x: number, y: number): void
   reveal(x: number, y: number): void
   combo(x: number, y: number): void
+  score(x: number, y: number, value: number, cascade: number): void
+  multi(points: { x: number; y: number }[]): void
 }
-const NO_FX: BoardFx = { pop() {}, blast() {}, fakeHit() {}, step() {}, infect() {}, reveal() {}, combo() {} }
+const NO_FX: BoardFx = { pop() {}, blast() {}, fakeHit() {}, step() {}, infect() {}, reveal() {}, combo() {}, score() {}, multi() {} }
 
 const OVERLAY: Record<string, string> = { row: "fx-row", col: "fx-col", notify: "fx-notify", kep: "fx-kep", police: "fx-police" }
 
@@ -341,6 +344,7 @@ export class BoardView extends Container {
       const p = this.pos(st.fired[0].index)
       this.fx.combo(p.x, p.y)
     }
+    if (st.fired.length >= 2) this.fx.multi(st.fired.map((f) => this.pos(f.index)))
     for (const f of st.fired) {
       const p = this.pos(f.index)
       this.fx.blast(f.special, p.x, p.y, f.area.map((i) => this.pos(i)))
@@ -360,7 +364,10 @@ export class BoardView extends Container {
         .then(() => tween(s.scale, { x: 0, y: 0, duration: 0.13 / speed, ease: "back.in(2)" }))
         .then(() => s.destroy()))
     })
-    if (st.cleared.length) this.fx.step(k, st.cleared.length, cx / st.cleared.length, cy / st.cleared.length)
+    if (st.cleared.length) {
+      this.fx.step(k, st.cleared.length, cx / st.cleared.length, cy / st.cleared.length)
+      this.fx.score(cx / st.cleared.length, cy / st.cleared.length, stepScore(st, k), k)
+    }
     // 4. fakes take hits
     for (const h of st.fakesHit) {
       const s = this.spriteAt(h.index)

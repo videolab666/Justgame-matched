@@ -7,9 +7,25 @@ type Live = { p: Particle; vx: number; vy: number; life: number; max: number; sp
 export class Bursts {
   readonly view: ParticleContainer
   private live: Live[] = []
-  constructor(private tex: Texture) {
+  constructor(private tex: Texture, additive = true) {
     this.view = new ParticleContainer({ texture: tex, dynamicProperties: { position: true, rotation: true, vertex: true, color: true } })
-    this.view.blendMode = "add"
+    if (additive) this.view.blendMode = "add"
+  }
+
+  /** Gold coins: a fountain from a point (big wins). */
+  fountain(x: number, y: number, n: number) {
+    for (let k = 0; k < n; k++) {
+      const a = -Math.PI / 2 + (Math.random() - 0.5) * 1.6
+      this.spawn(x, y, 0xffffff, a, 260 + Math.random() * 320, 0.32 + Math.random() * 0.22, 1.1 + Math.random() * 0.5, 900, 0.4)
+    }
+  }
+
+  /** Gold coins raining over a width (jackpot). */
+  rain(width: number, top: number, n: number) {
+    for (let k = 0; k < n; k++) {
+      this.spawn(Math.random() * width, top - Math.random() * 260, 0xffffff, Math.PI / 2 + (Math.random() - 0.5) * 0.3,
+        120 + Math.random() * 200, 0.3 + Math.random() * 0.25, 2 + Math.random(), 500, 0.2)
+    }
   }
 
   private spawn(x: number, y: number, color: number, angle: number, speed: number, size: number, life: number, g: number, drag: number) {

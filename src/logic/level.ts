@@ -46,7 +46,7 @@ export type MoveResult = {
   interruptDue: boolean
 }
 
-const rulesOf = (def: LevelDef): Rules => ({ specials: new Set(def.specials), combos: !!def.combos })
+export const rulesOf = (def: LevelDef): Rules => ({ specials: new Set(def.specials), combos: !!def.combos })
 
 export function startLevel(def: LevelDef, seed: number): LevelState {
   const rng = makeRng(seed)
@@ -59,6 +59,12 @@ export function startLevel(def: LevelDef, seed: number): LevelState {
 
 /** Score: Σ group size² growing by half per cascade, +3 per blast cell,
  * +20 per destroyed fake. */
+/** Score of one cascade step (`k` = its index in the move). */
+export function stepScore(s: Step, k: number): number {
+  const groups = s.matched.reduce((a, m) => a + m.cells.length ** 2, 0)
+  return Math.round(groups * (1 + k * 0.5)) + 3 * s.fired.reduce((a, f) => a + f.area.length, 0) + 20 * s.fakesHit.filter((h) => h.destroyed).length
+}
+
 export function scoreSteps(steps: Step[]): number {
   let total = 0
   steps.forEach((s, k) => {

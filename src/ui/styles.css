@@ -142,3 +142,11 @@ button { font: inherit; cursor: pointer; }
 /* Wrong answer: shake after the pop-in, keeping the centring transform. */
 .verdict.bad { animation: pop .35s cubic-bezier(.2,1.4,.4,1), vshake .5s .3s; }
 @keyframes vshake { 0%, 100% { transform: translate(-50%, -50%); } 20% { transform: translate(calc(-50% - 14px), -50%); } 40% { transform: translate(calc(-50% + 11px), -50%); } 60% { transform: translate(calc(-50% - 7px), -50%); } 80% { transform: translate(calc(-50% + 4px), -50%); } }
+
+/* Casino combo meter */
+.combo-meter { position: absolute; left: 50%; top: calc(var(--safe-top) + 92px); transform: translateX(-50%); opacity: 0; pointer-events: none; z-index: 5;
+  min-width: 86px; padding: 6px 18px; border-radius: 999px; overflow: hidden; text-align: center; font-family: var(--head); font-size: 26px; color: #3a1a00;
+  background: var(--candy-shine), linear-gradient(160deg, #fff59e, #ffd21f 50%, #ff9a1f); box-shadow: 0 0 0 3px #fff, 0 0 24px #ffd21f, 0 6px 0 #b85a00; }
+.combo-meter span { display: inline-block; }
+.combo-meter[data-level="4"], .combo-meter[data-level="5"] { background: var(--candy-shine), linear-gradient(160deg, #ff9ad1, #ff3d9a 50%, #c2187a); color: #fff; box-shadow: 0 0 0 3px #fff, 0 0 30px #ff3d9a, 0 6px 0 #8a0f5a; }
+.combo-meter[data-level="6"], .combo-meter[data-level="7"], .combo-meter[data-level="8"] { color: #fff; background: var(--candy-shine), linear-gradient(90deg, #ff7ab8, #ffe14d, #5ff2b6, #7ab8ff, #c77aff); box-shadow: 0 0 0 3px #fff, 0 0 40px #fff, 0 6px 0 #5a24c8; }

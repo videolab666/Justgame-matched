@@ -1,12 +1,16 @@
 import { gsap } from "gsap"
 import { RGBSplitFilter, ShockwaveFilter } from "pixi-filters"
-import { Container, Sprite, type Texture } from "pixi.js"
+import { Container, FillGradient, Sprite, type Texture } from "pixi.js"
 import { sfx } from "../audio/sfx"
 import type { BoardFx, BoardView } from "../render/board-view"
 import { Bursts } from "./particles"
 import { beam, bolt, flash, popText, ring, shake, slowMo } from "./juice"
 import { quality } from "./quality"
+import { comboMeter } from "../ui/combo"
 
+const RAINBOW = () => new FillGradient({ type: "linear", start: { x: 0, y: 0 }, end: { x: 1, y: 0 }, colorStops: [
+  { offset: 0, color: "#ff7ab8" }, { offset: 0.3, color: "#ffe14d" }, { offset: 0.6, color: "#5ff2b6" }, { offset: 1, color: "#7ab8ff" },
+] })
 const COMBO = ["", "Супер!", "Схему зламано!", "Мега-комбо!", "Кібергерой!"]
 const MAGENTA = 0xff3bd4
 
@@ -15,6 +19,8 @@ export class BoardEffects implements BoardFx {
   readonly layer = new Container()
   private sparkTex: Texture
   private bursts: Bursts
+  private coins: Bursts
+  private jackpotMove = false
   private lastPop = 0
   private twinkleAt = 0
   private glitchAt = 0
@@ -22,12 +28,15 @@ export class BoardEffects implements BoardFx {
   constructor(private view: BoardView, private shakeTarget: Container, tex: Record<string, Texture>, private screen: () => { w: number; h: number }, private screenLayer: Container) {
     this.bursts = new Bursts(tex.spark)
     this.sparkTex = tex.spark
+    this.coins = new Bursts(tex.coin, false)
     this.layer.addChild(this.bursts.view)
+    this.screenLayer.addChild(this.coins.view)
     view.addChild(this.layer)
   }
 
   update(dt: number, now: number) {
     this.bursts.update(dt)
+    this.coins.update(dt)
     // Idle glitch on a random fake every ~1.2 s keeps them visibly "wrong".
     if (now > this.glitchAt) {
       this.glitchAt = now + 900 + Math.random() * 900
@@ -123,7 +132,39 @@ export class BoardEffects implements BoardFx {
     } else sfx.fake()
   }
 
+  score(x: number, y: number, value: number, cascade: number) {
+    if (value <= 0) return
+    popText(this.layer, "+" + value, x, y + this.view.cell * 0.4, 20 + Math.min(cascade, 5) * 3, "#ffffff")
+    comboMeter(cascade + 1)
+  }
+
+  multi(points: { x: number; y: number }[]) {
+    for (const p of points) ring(this.layer, p.x, p.y, 0xffe14d, this.view.cell * 1.6, 8)
+    const s = this.screen()
+    flash(this.screenLayer, s.w, s.h, 0xffd6f0, 0.4)
+    popText(this.layer, "МУЛЬТИВИБУХ!", this.view.cell * 3.5, this.view.cell * 2.2, 36)
+    const g = this.view.toGlobal(points[0])
+    if (!quality.reducedMotion) this.coins.fountain(g.x, g.y, 18)
+    sfx.boom(); sfx.win()
+    shake(this.shakeTarget, 14)
+  }
+
+  /** Called once per move: resets the jackpot latch and the combo meter. */
+  moveDone() { this.jackpotMove = false; comboMeter(0) }
+
+  jackpot() {
+    if (this.jackpotMove) return
+    this.jackpotMove = true
+    const s = this.screen()
+    flash(this.screenLayer, s.w, s.h, 0xffe14d, 0.45)
+    popText(this.layer, "ДЖЕКПОТ!", this.view.cell * 3.5, this.view.cell * 3.2, 52, RAINBOW())
+    if (!quality.reducedMotion) this.coins.rain(s.w, 0, 70)
+    slowMo(0.7)
+    sfx.win()
+  }
+
   step(cascade: number, cleared: number, x: number, y: number) {
+    if (cascade >= 4) this.jackpot()
     const text = COMBO[Math.min(cascade, COMBO.length - 1)] || (cleared >= 5 ? "Чудово!" : "")
     if (text) popText(this.layer, text, Math.min(Math.max(x, 90), this.view.cell * 7 - 90), y, cascade >= 3 ? 40 : 32)
     if (cleared >= 4 || cascade >= 2) shake(this.shakeTarget, 4 + cascade * 3)
@@ -147,6 +188,7 @@ export class BoardEffects implements BoardFx {
 
   combo(x: number, y: number) {
     popText(this.layer, "Супер-комбо!", Math.min(Math.max(x, 110), this.view.cell * 7 - 110), y, 38)
+    this.jackpot()
     slowMo(0.5)
     shake(this.shakeTarget, 14)
   }
