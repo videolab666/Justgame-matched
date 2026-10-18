@@ -1,5 +1,7 @@
 import { sfx } from "../audio/sfx"
 import type { Channel, Scam } from "../content/types"
+import { gsap } from "gsap"
+import { centre, sparkleBurst } from "./anim"
 import { el, esc, highlight } from "./text"
 
 const CHANNEL: Record<Channel, [string, string]> = {
@@ -7,7 +9,7 @@ const CHANNEL: Record<Channel, [string, string]> = {
   olx: ["🛒", "Оголошення"], diia: ["🏛️", "Дія"], instagram: ["📸", "Instagram"], game: ["🎮", "Гра"],
 }
 
-export type ScamAnswer = { answer: "fake" | "real" | "timeout"; correct: boolean }
+export type ScamAnswer = { answer: "fake" | "real" | "timeout" | "skip"; correct: boolean }
 
 /** Messenger-style card over the board. Swipe left = «Фейк», right =
  * «Справжнє» (or tap the buttons). Resolves after the verdict is shown;
@@ -25,13 +27,16 @@ export function showScam(root: HTMLElement, scam: Scam, seconds: number, rewardT
       <div class="bubble ${scam.channel === "call" ? "call" : ""}">${scam.channel === "call" ? "🔊 " : ""}${esc(scam.text)}</div>
       <div class="stamp fake">ФЕЙК</div><div class="stamp real">СПРАВЖНЄ</div>`
     const actions = el("div", "scam-actions", `<button class="fake">← Фейк</button><button class="real">Справжнє →</button>`)
-    wrap.append(card, actions)
+    const skip = el("button", "skip-btn", "Пропустити ⏭")
+    wrap.append(card, actions, skip)
     back.append(wrap)
     root.append(back)
     card.animate([{ transform: "translateY(-120px) scale(.6) rotate(-8deg)", opacity: 0 }, { transform: "none", opacity: 1 }],
       { duration: 420, easing: "cubic-bezier(.2,1.4,.4,1)" })
     if (scam.channel === "call") card.animate([{ transform: "rotate(-1.5deg)" }, { transform: "rotate(1.5deg)" }], { duration: 90, iterations: 8, direction: "alternate", delay: 420 })
     sfx.whoosh()
+    gsap.fromTo(actions.children, { y: 40, opacity: 0, scale: 0.7 }, { y: 0, opacity: 1, scale: 1, duration: 0.45, ease: "back.out(2)", stagger: 0.08, delay: 0.25, clearProps: "all" })
+    setTimeout(() => { const c = centre(card); sparkleBurst(c.x, c.y - 40, 12, 150) }, 300)
 
     const arc = card.querySelector(".arc") as SVGCircleElement
     const num = card.querySelector(".timer text") as SVGTextElement
@@ -46,25 +51,44 @@ export function showScam(root: HTMLElement, scam: Scam, seconds: number, rewardT
       if (done) return
       done = true
       cancelAnimationFrame(raf)
-      const correct = answer !== "timeout" && (answer === "fake") === scam.isFake
+      const correct = (answer === "fake" || answer === "real") && (answer === "fake") === scam.isFake
       const dir = answer === "fake" ? -1 : answer === "real" ? 1 : 0
       card.style.transition = "transform .35s cubic-bezier(.5,0,.75,0), opacity .35s"
       card.style.transform = dir ? `translateX(${dir * 140}vw) rotate(${dir * 35}deg)` : "scale(.4)"
       card.style.opacity = "0"
       actions.style.opacity = "0"
-      if (correct) sfx.good(); else sfx.bad()
+      skip.style.opacity = "0"
+      const from = centre(card)
+      if (answer === "skip") sfx.whoosh()
+      else if (correct) { sfx.good(); sparkleBurst(from.x + dir * 80, from.y, 22, 170) }
+      else sfx.bad()
       const r: ScamAnswer = { answer, correct }
-      const title = answer === "timeout" ? "⏰ Час вийшов!" : correct ? (scam.isFake ? "✓ Так, це фейк!" : "✓ Так, це справжнє!")
+      const title = answer === "skip" ? "⏭ Пропущено" : answer === "timeout" ? "⏰ Час вийшов!" : correct ? (scam.isFake ? "✓ Так, це фейк!" : "✓ Так, це справжнє!")
         : (scam.isFake ? "✗ Ой! Це був фейк" : "✗ Ні, це було справжнє")
-      const v = el("div", `verdict ${correct ? "good" : "bad"}`)
+      const v = el("div", `verdict ${correct ? "good" : answer === "skip" ? "skip" : "bad"}`)
       v.innerHTML = `<h3>${title}</h3>
         ${!correct && scam.isFake ? `<div class="scam-card" style="width:auto;margin:8px 0;box-shadow:none"><div class="bubble">${highlight(scam.text, scam.flags)}</div></div>` : ""}
-        <div>${esc(scam.explain)}</div><div class="reward">${esc(rewardText(r))}</div>`
+        <div>${esc(scam.explain)}</div><div class="reward">${esc(rewardText(r))}</div>
+        <div class="tap">Торкнись, щоб продовжити</div>`
       setTimeout(() => {
         wrap.remove()
         back.append(v)
-        const close = () => { back.remove(); resolve(r) }
-        const timer = setTimeout(close, correct ? 2200 : 4200)
+        const c = centre(v)
+        if (correct) {
+          sparkleBurst(c.x, c.y - 60, 26, 190)
+          gsap.fromTo(v.querySelector("h3"), { scale: 0.4 }, { scale: 1, duration: 0.6, ease: "elastic.out(1, 0.45)" })
+        } else if (answer !== "skip") {
+          back.classList.add("alarm")
+        }
+        let closed = false
+        const close = () => {
+          if (closed) return
+          closed = true
+          gsap.to(v, { scale: 0.7, opacity: 0, y: -30, duration: 0.22, ease: "power2.in" })
+          gsap.to(back, { opacity: 0, duration: 0.25, delay: 0.08, onComplete: () => { back.remove(); resolve(r) } })
+        }
+        // Long enough to read; a tap continues at once.
+        const timer = setTimeout(close, answer === "skip" ? 1200 : correct ? 4000 : 7500)
         back.onclick = () => { clearTimeout(timer); close() }
       }, 260)
     }
@@ -105,5 +129,6 @@ export function showScam(root: HTMLElement, scam: Scam, seconds: number, rewardT
     card.addEventListener("pointercancel", release)
     ;(actions.querySelector(".fake") as HTMLButtonElement).onclick = () => finish("fake")
     ;(actions.querySelector(".real") as HTMLButtonElement).onclick = () => finish("real")
+    skip.onclick = () => finish("skip")
   })
 }

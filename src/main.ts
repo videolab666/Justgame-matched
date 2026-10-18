@@ -18,11 +18,12 @@ import { loadSave, writeSave } from "./save"
 import { mountHud } from "./ui/hud"
 import { showScam } from "./ui/scam-card"
 import { showDailyResult, showIntro, showMap, showResult, showSettings, showStart } from "./ui/screens"
+import { wireButtonSparkles } from "./ui/anim"
 import "./ui/styles.css"
 
 const HUD_TOP = 130
 const BOTTOM = 24
-const SCAM_SECONDS = 6
+const SCAM_SECONDS = 10
 
 export type Answer = { scam: Scam; answer: string; correct: boolean }
 
@@ -69,7 +70,7 @@ async function boot() {
     view.position.set(Math.round((innerWidth - cell * BOARD.w) / 2), Math.min(top, innerHeight - boardH - BOTTOM))
     setRest(stage)
     const grad = new FillGradient({ type: "linear", start: { x: 0, y: 0 }, end: { x: 0, y: 1 }, colorStops: [
-      { offset: 0, color: "#ff6fb5" }, { offset: 0.22, color: "#9b3fe0" }, { offset: 0.6, color: "#4a1fa8" }, { offset: 1, color: "#1e0b52" },
+      { offset: 0, color: "#7a3a8f" }, { offset: 0.25, color: "#4f2585" }, { offset: 0.6, color: "#2c1460" }, { offset: 1, color: "#140838" },
     ] })
     bg.clear().rect(0, 0, innerWidth, innerHeight).fill(grad)
     // Soft candy bokeh (fixed pattern so it does not jump on resize).
@@ -77,7 +78,7 @@ async function boot() {
       [0.12, 0.08, 46, 0xffe14d, 0.18], [0.85, 0.12, 60, 0x7ab8ff, 0.16], [0.7, 0.35, 34, 0xff9ad1, 0.14],
       [0.08, 0.55, 54, 0x5ff2b6, 0.12], [0.92, 0.7, 70, 0xffa95c, 0.12], [0.3, 0.9, 64, 0xc77aff, 0.14], [0.6, 0.82, 26, 0xffffff, 0.12],
     ]
-    for (const [x, y, r, color, alpha] of dots) bg.circle(x * innerWidth, y * innerHeight, r).fill({ color, alpha })
+    for (const [x, y, r, color, alpha] of dots) bg.circle(x * innerWidth, y * innerHeight, r).fill({ color, alpha: alpha * 0.55 })
   }
   layout()
   addEventListener("resize", layout)
@@ -118,6 +119,7 @@ async function boot() {
     clock.paused = true
     const timed = clock.active
     const r = await showScam(ui, scam, SCAM_SECONDS, (a) =>
+      a.answer === "skip" ? "Без бонусу і без штрафу" :
       a.correct ? (scam.isFake ? "🛡️ Бонус: Кіберполіція!" : timed ? "⏱️ +5 секунд!" : "➕ +2 ходи!") : "⚠️ +2 фейки на полі")
     clock.paused = false
     answers.push({ scam, answer: r.answer, correct: r.correct })
@@ -133,6 +135,8 @@ async function boot() {
       await view.playSteps(res.steps)
       state = res.state
       await view.setBoard(state.board, true)
+    } else if (r.answer === "skip") {
+      // Skipped: nothing changes on the board.
     } else if (r.correct && timed) {
       clock.left += 5
       popText(fx.layer, "+5 секунд", mid.x, mid.y, 36)
@@ -156,8 +160,12 @@ async function boot() {
     hud.resetStars()
     hud.update(state)
     void view.setBoard(state.board)
-    view.locked = false
+    view.locked = true
     ui.classList.add("in-level")
+    clock.paused = true
+    gsap.fromTo(".hud", { y: -150 }, { y: 0, duration: 0.7, ease: "back.out(1.6)", clearProps: "transform" })
+    gsap.fromTo(".gear", { scale: 0, rotation: -180 }, { scale: 1, rotation: 0, duration: 0.6, delay: 0.25, ease: "back.out(2)", clearProps: "transform" })
+    void view.dropIn().then(() => { view.locked = false; clock.paused = false })
     return new Promise((resolve) => { endLevel = (r) => { ui.classList.remove("in-level"); resolve(r) } })
   }
 
@@ -183,6 +191,7 @@ async function boot() {
     const outcome = await playLevel(def, seed)
     if (outcome === "quit") return
     view.locked = true
+    await view.blowAway(true)
     if (save.daily.key !== key) save.daily = { key, best: 0 }
     const record = state.score > save.daily.best
     save.daily.best = Math.max(save.daily.best, state.score)
@@ -192,7 +201,7 @@ async function boot() {
     fx.confetti()
     await wait(900)
     const fakes = state.progress[0]
-    const text = shareText({ key, score: state.score, fakes, answers: answers.map((a) => a.correct), streak: save.streak.count, url: location.origin + location.pathname })
+    const text = shareText({ key, score: state.score, fakes, answers: answers.filter((a) => a.answer !== "skip").map((a) => a.correct), streak: save.streak.count, url: location.origin + location.pathname })
     const c = await showDailyResult(ui, { score: state.score, fakes, best: save.daily.best, record, streak: save.streak.count, text, answers })
     if (c === "retry") return playDaily()
   }
@@ -201,6 +210,7 @@ async function boot() {
   // Debug handle for automated checks (state is read-only from outside).
   ;(window as unknown as { __nv: unknown }).__nv = { get state() { return state }, get answers() { return answers }, view, fx, interrupt }
   registerSW()
+  wireButtonSparkles()
   if (!save.audience) { save.audience = await showStart(ui); writeSave(save) }
   const chapterOf = (id: string) => CHAPTERS.findIndex((c) => c.levels.some((l) => l.id === id))
   let ci = Math.max(0, chapterOf((LEVELS.find((l) => !save.stars[l.id]) ?? LEVELS[LEVELS.length - 1]).id))
@@ -231,8 +241,9 @@ async function boot() {
         writeSave(save)
         sfx.win()
         fx.confetti()
-        await wait(1100)
-      } else await wait(500)
+      }
+      view.locked = true
+      await view.blowAway(won)
       const c = await showResult(ui, { won, stars, score: state.score, hasNext: k + 1 < LEVELS.length, answers })
       if (c === "map") break
       if (c === "next") k++

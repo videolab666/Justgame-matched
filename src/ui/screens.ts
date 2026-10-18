@@ -4,6 +4,7 @@ import { KIND_NAMES } from "../logic/cells"
 import type { LevelDef } from "../logic/level"
 import { svgUrl } from "../render/textures"
 import type { SaveData } from "../save"
+import { enterScreen, leaveScreen } from "./anim"
 import { fakeIcon } from "./icons"
 import { el, esc, highlight } from "./text"
 
@@ -14,7 +15,17 @@ function screen<T>(root: HTMLElement, html: string, wire: (s: HTMLElement, done:
   return new Promise((resolve) => {
     const s = el("div", "screen", html)
     root.append(s)
-    wire(s, (v) => { sfx.unlock(); s.remove(); resolve(v) })
+    enterScreen(s)
+    let closing = false
+    wire(s, async (v) => {
+      if (closing) return
+      closing = true
+      sfx.unlock()
+      s.style.pointerEvents = "none"
+      await leaveScreen(s)
+      s.remove()
+      resolve(v)
+    })
   })
 }
 
@@ -41,7 +52,7 @@ export function showMap(root: HTMLElement, save: SaveData, chapters: Chapter[], 
   const all = chapters.flatMap((c) => c.levels)
   const open = (id: string) => {
     const g = all.findIndex((l) => l.id === id)
-    return save.allOpen || g === 0 || (save.stars[all[g - 1].id] ?? 0) > 0
+    return g >= 0 // every level is open from the start
   }
   const ch = chapters[ci]
   const levels = ch.levels
@@ -70,11 +81,9 @@ export function showMap(root: HTMLElement, save: SaveData, chapters: Chapter[], 
     <div class="map">${tiles}</div>
     ${chek()}
     <div class="say">${say}</div>
-    <div class="row">${save.allOpen ? "" : `<button class="link" data-open>Відкрити всі рівні</button>`}<button class="link" data-settings>⚙️ Налаштування</button>${install}</div>`,
+    <div class="row"><button class="link" data-settings>⚙️ Налаштування</button>${install}</div>`,
   (s, done) => {
     s.querySelectorAll<HTMLButtonElement>(".lvl:not(.locked)").forEach((b) => (b.onclick = () => done({ kind: "level", id: levels[Number(b.dataset.k)].id })))
-    const o = s.querySelector<HTMLButtonElement>("[data-open]")
-    if (o) o.onclick = () => { save.allOpen = true; done({ kind: "refresh" }) }
     s.querySelector<HTMLButtonElement>("[data-settings]")!.onclick = () => done({ kind: "settings" })
     s.querySelector<HTMLButtonElement>("[data-daily]")!.onclick = () => done({ kind: "daily" })
     const ins = s.querySelector<HTMLButtonElement>("[data-install]")
@@ -107,8 +116,8 @@ export type ReviewItem = { scam: Scam; answer: string; correct: boolean }
 export function showResult(root: HTMLElement, r: { won: boolean; stars: number; score: number; hasNext: boolean; answers: ReviewItem[] }): Promise<ResultChoice> {
   const stars = [1, 2, 3].map((k) => `<span class="${k <= r.stars ? "on" : ""}" style="animation-delay:${0.15 + k * 0.18}s">⭐</span>`).join("")
   const review = r.answers.map((a) => {
-    const verdict = a.answer === "timeout" ? "⏰ Не встиг" : a.correct ? "✓ Правильно" : "✗ Помилка"
-    return `<div class="item"><span class="tag ${a.correct ? "ok" : "no"}">${verdict} · ${a.scam.isFake ? "ФЕЙК" : "СПРАВЖНЄ"}</span>
+    const verdict = a.answer === "skip" ? "⏭ Пропущено" : a.answer === "timeout" ? "⏰ Не встиг" : a.correct ? "✓ Правильно" : "✗ Помилка"
+    return `<div class="item"><span class="tag ${a.correct ? "ok" : a.answer === "skip" ? "skip" : "no"}">${verdict} · ${a.scam.isFake ? "ФЕЙК" : "СПРАВЖНЄ"}</span>
       <q>${highlight(a.scam.text, a.scam.flags)}</q><div class="why">${esc(a.scam.explain)}</div></div>`
   }).join("")
   return screen(root, `
@@ -125,15 +134,15 @@ export function showResult(root: HTMLElement, r: { won: boolean; stars: number; 
 /** Daily result with a share card (share sheet, or copy to clipboard). */
 export function showDailyResult(root: HTMLElement, r: { score: number; fakes: number; best: number; record: boolean; streak: number; text: string; answers: ReviewItem[] }): Promise<"retry" | "map"> {
   const review = r.answers.map((a) => {
-    const verdict = a.answer === "timeout" ? "⏰ Не встиг" : a.correct ? "✓ Правильно" : "✗ Помилка"
-    return `<div class="item"><span class="tag ${a.correct ? "ok" : "no"}">${verdict} · ${a.scam.isFake ? "ФЕЙК" : "СПРАВЖНЄ"}</span>
+    const verdict = a.answer === "skip" ? "⏭ Пропущено" : a.answer === "timeout" ? "⏰ Не встиг" : a.correct ? "✓ Правильно" : "✗ Помилка"
+    return `<div class="item"><span class="tag ${a.correct ? "ok" : a.answer === "skip" ? "skip" : "no"}">${verdict} · ${a.scam.isFake ? "ФЕЙК" : "СПРАВЖНЄ"}</span>
       <q>${highlight(a.scam.text, a.scam.flags)}</q><div class="why">${esc(a.scam.explain)}</div></div>`
   }).join("")
   return screen(root, `
     <h1>Справа дня</h1>
     <div class="share-card"><div class="big-num">${r.score}</div><small>очок${r.record ? " · новий рекорд!" : ""}</small>
       <div class="row"><span>🛡️ ${r.fakes} фейків</span><span>🔥 серія ${r.streak}</span><span>🏆 ${r.best}</span></div>
-      <div class="dots">${r.answers.map((a) => (a.correct ? "✅" : "❌")).join("")}</div></div>
+      <div class="dots">${r.answers.filter((a) => a.answer !== "skip").map((a) => (a.correct ? "✅" : "❌")).join("")}</div></div>
     <button class="big gold" data-share>📤 Поділитися</button>
     <div class="row"><button class="big alt" data-c="retry">↻ Ще раз</button></div>
     <button class="link" data-c="map">До карти</button>

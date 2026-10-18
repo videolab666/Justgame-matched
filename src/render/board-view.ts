@@ -124,6 +124,44 @@ export class BoardView extends Container {
     }
   }
 
+  /** Level start: tiles rain down column by column and bounce into place. */
+  dropIn(): Promise<void> {
+    const h = this.g.h * this.cell
+    let last = 0
+    this.cells.forEach((c, i) => {
+      if (!c) return
+      const s = this.sprites.get(c.id)
+      if (!s) return
+      const p = this.pos(i)
+      const { r, c: col } = rc(this.g, i)
+      const delay = col * 0.035 + (this.g.h - 1 - r) * 0.045
+      last = Math.max(last, delay)
+      gsap.fromTo(s, { y: p.y - h - this.cell }, { y: p.y, duration: 0.6, delay, ease: "bounce.out" })
+      gsap.fromTo(s.scale, { x: 0.6, y: 1.25 }, { x: 1, y: 1, duration: 0.6, delay: delay + 0.35, ease: "elastic.out(1, 0.5)" })
+    })
+    return new Promise((done) => setTimeout(done, (last + 0.65) * 1000))
+  }
+
+  /** Level end: tiles pop away (won) or tumble off the board (lost). */
+  blowAway(won: boolean): Promise<void> {
+    const h = this.g.h * this.cell
+    this.cells.forEach((c) => {
+      if (!c) return
+      const s = this.sprites.get(c.id)
+      if (!s) return
+      const delay = Math.random() * 0.45
+      if (won) {
+        gsap.to(s.scale, { x: 1.35, y: 1.35, duration: 0.12, delay, ease: "power2.out" })
+        gsap.to(s.scale, { x: 0, y: 0, duration: 0.25, delay: delay + 0.12, ease: "back.in(2.2)" })
+        gsap.to(s, { rotation: (Math.random() - 0.5) * 2, duration: 0.37, delay })
+        if (Math.random() < 0.35) gsap.delayedCall(delay + 0.2, () => this.fx.pop(s.x, s.y, 0xffffff, 1))
+      } else {
+        gsap.to(s, { y: s.y + h + this.cell * 2, rotation: (Math.random() - 0.5) * 3, duration: 0.7, delay, ease: "power2.in" })
+      }
+    })
+    return new Promise((done) => setTimeout(done, 1000))
+  }
+
   /** Sprites currently showing fakes (for idle glitch effects). */
   fakeSprites(): Container[] {
     const out: Container[] = []
