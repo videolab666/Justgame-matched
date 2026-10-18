@@ -4,7 +4,7 @@ const RAW = import.meta.glob("./tiles/*.svg", { query: "?raw", import: "default"
 
 export const TILE_TEXTURES = ["passport", "stamp", "key", "phone", "card", "envelope"] as const
 /** Tile colours for particles and flashes, by kind. */
-export const KIND_COLORS = [0x4f7dff, 0xff3b5c, 0xffc928, 0x3be39a, 0xa45cff, 0xff9a2e]
+export const KIND_COLORS = [0x7ab8ff, 0xff5c9a, 0xffe14d, 0x5ff2b6, 0xc77aff, 0xffa95c]
 
 async function rasterize(svg: string, size: number): Promise<Texture> {
   const img = new Image()

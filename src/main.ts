@@ -49,6 +49,7 @@ async function boot() {
   const clock = { active: false, left: 0, paused: false, up: false, shown: -1 }
   app.ticker.add((t) => {
     fx.update((t.deltaMS / 1000) * gsap.globalTimeline.timeScale(), performance.now())
+    fx.twinkle(performance.now())
     quality.sample(t.deltaMS)
     if (!clock.active || clock.paused || clock.up) return
     clock.left = Math.max(0, clock.left - t.deltaMS / 1000)
@@ -67,9 +68,15 @@ async function boot() {
     view.position.set(Math.round((innerWidth - cell * BOARD.w) / 2), Math.min(top, innerHeight - boardH - BOTTOM))
     setRest(stage)
     const grad = new FillGradient({ type: "linear", start: { x: 0, y: 0 }, end: { x: 0, y: 1 }, colorStops: [
-      { offset: 0, color: "#2b1a6e" }, { offset: 0.55, color: "#170f3d" }, { offset: 1, color: "#0b0822" },
+      { offset: 0, color: "#ff6fb5" }, { offset: 0.22, color: "#9b3fe0" }, { offset: 0.6, color: "#4a1fa8" }, { offset: 1, color: "#1e0b52" },
     ] })
     bg.clear().rect(0, 0, innerWidth, innerHeight).fill(grad)
+    // Soft candy bokeh (fixed pattern so it does not jump on resize).
+    const dots: [number, number, number, number, number][] = [
+      [0.12, 0.08, 46, 0xffe14d, 0.18], [0.85, 0.12, 60, 0x7ab8ff, 0.16], [0.7, 0.35, 34, 0xff9ad1, 0.14],
+      [0.08, 0.55, 54, 0x5ff2b6, 0.12], [0.92, 0.7, 70, 0xffa95c, 0.12], [0.3, 0.9, 64, 0xc77aff, 0.14], [0.6, 0.82, 26, 0xffffff, 0.12],
+    ]
+    for (const [x, y, r, color, alpha] of dots) bg.circle(x * innerWidth, y * innerHeight, r).fill({ color, alpha })
   }
   layout()
   addEventListener("resize", layout)

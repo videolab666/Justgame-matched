@@ -1,6 +1,6 @@
 import { gsap } from "gsap"
 import { RGBSplitFilter, ShockwaveFilter } from "pixi-filters"
-import { Container, type Texture } from "pixi.js"
+import { Container, Sprite, type Texture } from "pixi.js"
 import { sfx } from "../audio/sfx"
 import type { BoardFx, BoardView } from "../render/board-view"
 import { Bursts } from "./particles"
@@ -13,12 +13,15 @@ const MAGENTA = 0xff3bd4
 /** Wires board events to particles, filters, screen juice and sound. */
 export class BoardEffects implements BoardFx {
   readonly layer = new Container()
+  private sparkTex: Texture
   private bursts: Bursts
   private lastPop = 0
+  private twinkleAt = 0
   private glitchAt = 0
 
   constructor(private view: BoardView, private shakeTarget: Container, tex: Record<string, Texture>, private screen: () => { w: number; h: number }, private screenLayer: Container) {
     this.bursts = new Bursts(tex.spark)
+    this.sparkTex = tex.spark
     this.layer.addChild(this.bursts.view)
     view.addChild(this.layer)
   }
@@ -36,6 +39,27 @@ export class BoardEffects implements BoardFx {
         s.children[0] && gsap.fromTo(s.children[0], { alpha: 0.55 }, { alpha: 1, duration: 0.15 })
       }
     }
+  }
+
+  /** A tiny star sparkles on a random tile now and then (the "glitter" in candy). */
+  twinkle(now: number) {
+    if (now < this.twinkleAt || quality.reducedMotion) return
+    this.twinkleAt = now + (quality.heavy ? 160 : 420)
+    const c = this.view.cell
+    const x = (Math.floor(Math.random() * 7) + 0.2 + Math.random() * 0.6) * c
+    const y = (Math.floor(Math.random() * 8) + 0.15 + Math.random() * 0.5) * c
+    const s = new Sprite(this.sparkTex)
+    s.anchor.set(0.5)
+    s.position.set(x, y)
+    s.blendMode = "add"
+    s.tint = [0xffffff, 0xfff3b0, 0xffd6f0, 0xd6f3ff][Math.floor(Math.random() * 4)]
+    s.scale.set(0)
+    this.layer.addChild(s)
+    const size = (c / 64) * (0.35 + Math.random() * 0.35)
+    gsap.timeline({ onComplete: () => s.destroy() })
+      .to(s.scale, { x: size, y: size, duration: 0.22, ease: "back.out(3)" })
+      .to(s, { rotation: 0.8, duration: 0.5, ease: "none" }, 0)
+      .to(s.scale, { x: 0, y: 0, duration: 0.28, ease: "power2.in" }, 0.3)
   }
 
   private glitch(seconds: number, power: number) {
@@ -129,7 +153,7 @@ export class BoardEffects implements BoardFx {
 
   confetti() {
     const s = this.screen()
-    this.bursts.confetti(this.view.cell * 7, [0xff3b5c, 0xffe600, 0x3bff9a, 0x3bc8ff, 0xc03bff])
+    this.bursts.confetti(this.view.cell * 7, [0xff5c9a, 0xffe14d, 0x5ff2b6, 0x7ab8ff, 0xc77aff, 0xffffff])
     void s
   }
 }

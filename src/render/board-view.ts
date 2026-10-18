@@ -109,8 +109,11 @@ export class BoardView extends Container {
     this.slots.clear()
     for (let i = 0; i < this.g.w * this.g.h; i++) {
       const { r, c } = rc(this.g, i)
-      this.slots.roundRect(c * cell + 3, r * cell + 3, cell - 6, cell - 6, cell * 0.22)
-        .fill({ color: (r + c) % 2 ? 0x2a2170 : 0x342a86, alpha: 0.72 })
+      const x = c * cell + 3, y = r * cell + 3, s = cell - 6
+      this.slots.roundRect(x, y, s, s, cell * 0.26)
+        .fill({ color: (r + c) % 2 ? 0x5a2fb8 : 0x6b3ccf, alpha: 0.55 })
+        .stroke({ color: 0xffc8f0, alpha: 0.18, width: 2 })
+      this.slots.roundRect(x + s * 0.14, y + s * 0.07, s * 0.72, s * 0.13, s * 0.07).fill({ color: 0xffffff, alpha: 0.09 })
     }
     this.maskG.clear().rect(-cell, -cell * 0.35, w + 2 * cell, h + cell * 1.35).fill(0xffffff)
     for (const [, s] of this.sprites) s.setCell(s.cell, cell)

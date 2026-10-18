@@ -1,10 +1,24 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"><defs>
-<linearGradient id="t" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffb04f"/><stop offset=".55" stop-color="#ff3b5c"/><stop offset="1" stop-color="#8f0838"/></linearGradient></defs>
-<path d="M30 26h52l26 26v52a10 10 0 0 1-10 10H30a10 10 0 0 1-10-10V36a10 10 0 0 1 10-10z" fill="#4a0420" transform="translate(2 4)"/>
-<path d="M30 22h52l26 26v52a10 10 0 0 1-10 10H30a10 10 0 0 1-10-10V32a10 10 0 0 1 10-10z" fill="url(#t)" stroke="#3a031a" stroke-width="4" stroke-linejoin="round"/>
-<circle cx="84" cy="40" r="7" fill="#3a031a"/>
-<text x="62" y="82" font-family="Arial Black,Arial,sans-serif" font-weight="900" font-size="30" fill="#fff" text-anchor="middle" stroke="#3a031a" stroke-width="2">-90%</text>
-<rect x="34" y="92" width="44" height="6" rx="3" fill="#ffe0e8"/>
-<path d="M30 30q20-6 44-4" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" opacity=".55"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"><defs><filter id="gl" x="-10%" y="-10%" width="120%" height="120%" color-interpolation-filters="sRGB">
+<feTurbulence type="fractalNoise" baseFrequency=".62" numOctaves="2" seed="21" result="n"/>
+<feColorMatrix in="n" type="matrix" values="0 0 0 0 0.714  0 0 0 0 1.000  0 0 0 0 0.231  0 0 0 22 -16.4" result="d"/>
+<feComposite in="d" in2="SourceAlpha" operator="in" result="sp"/>
+<feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="1" seed="61" result="n2"/>
+<feColorMatrix in="n2" type="matrix" values="0 0 0 0 1  0 0 0 0 .85  0 0 0 0 .55  0 0 0 22 -16.9" result="d2"/>
+<feComposite in="d2" in2="SourceAlpha" operator="in" result="sp2"/>
+<feMerge result="spm"><feMergeNode in="sp"/><feMergeNode in="sp2"/></feMerge>
+<feGaussianBlur in="spm" stdDeviation="1.1" result="spb"/>
+<feGaussianBlur in="SourceAlpha" stdDeviation="2.4" result="bl"/>
+<feOffset in="bl" dx="0" dy="-3" result="up"/>
+<feComposite in="SourceAlpha" in2="up" operator="out" result="rim"/>
+<feFlood flood-color="#ffffff" flood-opacity=".55"/><feComposite in2="rim" operator="in" result="rimlight"/>
+<feMerge><feMergeNode in="SourceGraphic"/><feMergeNode in="rimlight"/><feMergeNode in="spb"/><feMergeNode in="spm"/></feMerge>
+</filter><linearGradient id="t" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffc06a"/><stop offset=".5" stop-color="#ff2d6f"/><stop offset="1" stop-color="#7a0047"/></linearGradient></defs>
+<ellipse cx="64" cy="119" rx="42" ry="6" fill="#2a0b4f" opacity=".35"/><g filter="url(#gl)">
+<path d="M30 22h52l26 26v52a10 10 0 0 1-10 10H30a10 10 0 0 1-10-10V32a10 10 0 0 1 10-10z" fill="url(#t)" stroke="#3a0326" stroke-width="4" stroke-linejoin="round"/>
+<circle cx="84" cy="40" r="7" fill="#3a0326"/>
+<text x="62" y="82" font-family="Arial Black,Arial,sans-serif" font-weight="900" font-size="30" fill="#fff" text-anchor="middle" stroke="#3a0326" stroke-width="2">-90%</text>
+<rect x="34" y="92" width="44" height="6" rx="3" fill="#ffe0ec"/>
+</g>
+<path d="M30 30q20-7 44-4" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" opacity=".65"/>
 <path d="M50 24l8 22-10 14 14 16-6 30M96 60l-16 10 8 14-12 20" fill="none" stroke="#2b0219" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"/>
 </svg>
