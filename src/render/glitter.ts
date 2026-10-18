@@ -17,14 +17,14 @@ export function makeGlitterTexture(px = 96, density = 1): Texture {
       g.beginPath(); g.arc(x + dx, y + dy, r, 0, Math.PI * 2); g.fill()
     }
   }
-  for (let k = 0; k < 150; k++) {
+  for (let k = 0; k < 75; k++) {
     g.fillStyle = COLORS[Math.floor(rnd() * COLORS.length)]
     g.globalAlpha = 0.25 + rnd() * 0.6
     dot(rnd() * size, rnd() * size, (0.5 + rnd() * 1.3) * density)
   }
   g.globalAlpha = 0.9
   g.fillStyle = "#ffffff"
-  for (let k = 0; k < 5; k++) {
+  for (let k = 0; k < 3; k++) {
     const x = rnd() * size, y = rnd() * size, s = (2.5 + rnd() * 2) * density
     g.beginPath()
     g.moveTo(x, y - s); g.quadraticCurveTo(x, y, x + s, y); g.quadraticCurveTo(x, y, x, y + s)

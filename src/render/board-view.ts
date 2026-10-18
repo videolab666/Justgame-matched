@@ -109,16 +109,16 @@ export class BoardView extends Container {
    * slowly cycle (iridescence) and a light band sweeps across every ~6 s. */
   animateSheen(dt: number, now: number) {
     if (quality.reducedMotion) return
-    this.glitter.tilePosition.x += dt * 5
-    this.glitter.tilePosition.y += dt * 2.5
+    this.glitter.tilePosition.x += dt * 3.5
+    this.glitter.tilePosition.y += dt * 1.75
     if (quality.heavy) {
-      this.hue.hue((now / 1000) * 40 % 360, false)
+      this.hue.hue((now / 1000) * 28 % 360, false)
       if (this.sheen.filters?.[0] !== this.hue) this.sheen.filters = [this.hue]
     } else if (this.sheen.filters?.length) this.sheen.filters = []
     const w = this.g.w * this.cell
     if (this.bandT < 0 && Math.random() < dt / 6) this.bandT = 0
     if (this.bandT >= 0) {
-      this.bandT += dt / 1.4
+      this.bandT += dt / 2
       this.band.x = -this.cell * 3 + (w + this.cell * 6) * this.bandT
       if (this.bandT >= 1) { this.bandT = -1; this.band.x = -this.cell * 3 }
     }
