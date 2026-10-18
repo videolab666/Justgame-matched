@@ -9,6 +9,7 @@ import { BoardEffects } from "./fx/board-fx"
 import { popText, setRest } from "./fx/juice"
 import { quality } from "./fx/quality"
 import { isTile } from "./logic/cells"
+import { applyBoosters, finaleRounds, spinWheel, WHEEL, type BoosterKind } from "./logic/bonus"
 import { addFakes, addMoves, applyMove, applyPolice, BOARD, starsFor, startLevel, type LevelDef, type LevelState } from "./logic/level"
 import { makeRng } from "./logic/rng"
 import { BoardView } from "./render/board-view"
@@ -17,8 +18,8 @@ import { installState, promptInstall, registerSW } from "./pwa"
 import { loadSave, writeSave } from "./save"
 import { mountHud } from "./ui/hud"
 import { showScam } from "./ui/scam-card"
-import { showDailyResult, showIntro, showMap, showResult, showSettings, showStart } from "./ui/screens"
-import { wireButtonSparkles } from "./ui/anim"
+import { showDailyResult, showIntro, showMap, showResult, showSettings, showStart, showWheel } from "./ui/screens"
+import { centre, sparkleBurst, wireButtonSparkles } from "./ui/anim"
 import "./ui/styles.css"
 
 const HUD_TOP = 130
@@ -153,7 +154,7 @@ async function boot() {
     else checkEnd()
   }
 
-  function playLevel(def: LevelDef, seed = Date.now() % 1_000_000): Promise<"won" | "lost" | "quit"> {
+  function playLevel(def: LevelDef, seed = Date.now() % 1_000_000, picks: BoosterKind[] = []): Promise<"won" | "lost" | "quit"> {
     state = startLevel(def, seed)
     Object.assign(clock, { active: !!def.timeLimit, left: def.timeLimit ?? 0, paused: false, up: false, shown: -1 })
     answers = []
@@ -165,7 +166,18 @@ async function boot() {
     clock.paused = true
     gsap.fromTo(".hud", { y: -150 }, { y: 0, duration: 0.7, ease: "back.out(1.6)", clearProps: "transform" })
     gsap.fromTo(".gear", { scale: 0, rotation: -180 }, { scale: 1, rotation: 0, duration: 0.6, delay: 0.25, ease: "back.out(2)", clearProps: "transform" })
-    void view.dropIn().then(() => { view.locked = false; clock.paused = false })
+    void view.dropIn().then(async () => {
+      if (picks.length) {
+        state = applyBoosters(state, picks, seed + 1).state
+        await view.setBoard(state.board, true)
+        hud.update(state)
+        const b = view.getBounds()
+        sparkleBurst(b.x + b.width / 2, b.y + b.height / 2, 24, 200)
+        sfx.special()
+      }
+      view.locked = false
+      clock.paused = false
+    })
     return new Promise((resolve) => { endLevel = (r) => { ui.classList.remove("in-level"); resolve(r) } })
   }
 
@@ -178,10 +190,47 @@ async function boot() {
     state = r.state
     await view.setBoard(state.board, true)
     if (r.hops) sfx.ring()
+    fx.moveDone()
     hud.update(state)
     if (clock.up) timeUp()
     else if (r.interruptDue) await interrupt()
     else checkEnd()
+  }
+
+  /** «Бонус-фінал»: each remaining move flies as a sparkle rocket from the
+   * moves badge to a tile, which turns into 2FA and fires. */
+  async function bonusFinale() {
+    const { state: after, rounds } = finaleRounds(state)
+    const mid = { x: view.cell * 3.5, y: view.cell * 3.5 }
+    popText(fx.layer, "БОНУС-ФІНАЛ!", mid.x, mid.y, 44)
+    sfx.special()
+    await wait(900)
+    const badge = document.querySelector(".hud .moves")
+    for (const r of rounds) {
+      const p = view.pos(r.at)
+      const g = view.toGlobal(p)
+      if (badge) await rocket(centre(badge), g)
+      await view.setBoard(r.before)
+      await view.playSteps(r.steps)
+      await view.setBoard(r.after)
+      state = { ...state, board: r.after, score: state.score + r.bonus, movesLeft: Math.max(0, state.movesLeft - 1) }
+      hud.update(state)
+    }
+    state = { ...after, status: state.status }
+    hud.update(state)
+  }
+
+  function rocket(from: { x: number; y: number }, to: { x: number; y: number }): Promise<void> {
+    return new Promise((done) => {
+      const s = document.createElement("span")
+      s.className = "rocket"
+      s.textContent = "✦"
+      document.body.append(s)
+      gsap.set(s, { x: from.x, y: from.y })
+      const mx = (from.x + to.x) / 2 + (Math.random() - 0.5) * 120, my = Math.min(from.y, to.y) - 80
+      gsap.to(s, { keyframes: [{ x: mx, y: my, duration: 0.18, ease: "power1.out" }, { x: to.x, y: to.y, duration: 0.18, ease: "power2.in" }],
+        onComplete: () => { s.remove(); sparkleBurst(to.x, to.y, 12, 70); sfx.pop(3); done() } })
+    })
   }
 
   async function playDaily() {
@@ -231,20 +280,31 @@ async function boot() {
     while (k >= 0 && k < LEVELS.length) {
       const def = LEVELS[k]
       ci = chapterOf(def.id)
-      await showIntro(ui, def)
-      const outcome = await playLevel(def)
+      const picks = await showIntro(ui, def, save.boosters)
+      for (const p of picks) save.boosters[p] = Math.max(0, save.boosters[p] - 1)
+      writeSave(save)
+      const outcome = await playLevel(def, undefined, picks)
       if (outcome === "quit") break
       const won = outcome === "won"
-      const stars = starsFor(def, state.score, won)
+      view.locked = true
+      if (won && state.movesLeft > 0) await bonusFinale()
+      const finalStars = starsFor(def, state.score, won)
       if (won) {
-        save.stars[def.id] = Math.max(save.stars[def.id] ?? 0, stars)
+        save.stars[def.id] = Math.max(save.stars[def.id] ?? 0, finalStars)
         writeSave(save)
         sfx.win()
         fx.confetti()
       }
-      view.locked = true
       await view.blowAway(won)
-      const c = await showResult(ui, { won, stars, score: state.score, hasNext: k + 1 < LEVELS.length, answers })
+      if (won) {
+        const idx = spinWheel(deckRng)
+        await showWheel(ui, idx)
+        const prize = WHEEL[idx].prize
+        if (prize === "jackpot") for (const b of ["row", "notify", "kep", "moves"] as BoosterKind[]) save.boosters[b]++
+        else save.boosters[prize]++
+        writeSave(save)
+      }
+      const c = await showResult(ui, { won, stars: finalStars, score: state.score, hasNext: k + 1 < LEVELS.length, answers })
       if (c === "map") break
       if (c === "next") k++
     }

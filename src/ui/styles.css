@@ -144,9 +144,31 @@ button { font: inherit; cursor: pointer; }
 @keyframes vshake { 0%, 100% { transform: translate(-50%, -50%); } 20% { transform: translate(calc(-50% - 14px), -50%); } 40% { transform: translate(calc(-50% + 11px), -50%); } 60% { transform: translate(calc(-50% - 7px), -50%); } 80% { transform: translate(calc(-50% + 4px), -50%); } }
 
 /* Casino combo meter */
-.combo-meter { position: absolute; left: 50%; top: calc(var(--safe-top) + 92px); transform: translateX(-50%); opacity: 0; pointer-events: none; z-index: 5;
+.combo-meter { position: absolute; left: 50%; top: calc(var(--safe-top) + 104px); transform: translateX(-50%); opacity: 0; pointer-events: none; z-index: 5;
   min-width: 86px; padding: 6px 18px; border-radius: 999px; overflow: hidden; text-align: center; font-family: var(--head); font-size: 26px; color: #3a1a00;
   background: var(--candy-shine), linear-gradient(160deg, #fff59e, #ffd21f 50%, #ff9a1f); box-shadow: 0 0 0 3px #fff, 0 0 24px #ffd21f, 0 6px 0 #b85a00; }
 .combo-meter span { display: inline-block; }
 .combo-meter[data-level="4"], .combo-meter[data-level="5"] { background: var(--candy-shine), linear-gradient(160deg, #ff9ad1, #ff3d9a 50%, #c2187a); color: #fff; box-shadow: 0 0 0 3px #fff, 0 0 30px #ff3d9a, 0 6px 0 #8a0f5a; }
 .combo-meter[data-level="6"], .combo-meter[data-level="7"], .combo-meter[data-level="8"] { color: #fff; background: var(--candy-shine), linear-gradient(90deg, #ff7ab8, #ffe14d, #5ff2b6, #7ab8ff, #c77aff); box-shadow: 0 0 0 3px #fff, 0 0 40px #fff, 0 6px 0 #5a24c8; }
+
+/* Boosters on the intro */
+.boosters { display: grid; gap: 8px; }
+.boosters small { color: var(--muted); }
+.booster { position: relative; display: grid; justify-items: center; gap: 2px; width: 76px; padding: 8px 4px 6px; border-radius: 18px; border: 2px solid var(--glass-edge); background: var(--candy-shine), var(--glass); color: #fff; font-size: 11px; }
+.booster img { width: 40px; height: 40px; }
+.booster .plus { font-family: var(--head); font-size: 24px; line-height: 40px; color: var(--gold); }
+.booster i { position: absolute; top: -6px; right: -6px; min-width: 22px; height: 22px; border-radius: 11px; background: #ff3d9a; font-style: normal; font-family: var(--head); font-size: 12px; line-height: 22px; box-shadow: 0 0 0 2px #fff; }
+.booster.on { border-color: #ffe14d; box-shadow: 0 0 18px #ffe14d; transform: translateY(-3px); }
+/* Fortune wheel */
+.wheel-wrap { position: relative; width: 300px; height: 300px; display: grid; place-items: center; }
+.wheel { position: relative; width: 268px; height: 268px; border-radius: 50%; box-shadow: 0 0 0 8px #fff, 0 0 0 14px #ff3d9a, 0 0 40px rgba(255, 210, 31, .6), inset 0 0 30px rgba(0, 0, 0, .25); }
+.wheel .seg { position: absolute; left: 50%; top: 0; width: 0; height: 50%; transform-origin: 0 100%; }
+.wheel .seg span { position: absolute; left: 0; top: 6px; height: 98px; transform: translateX(-50%); writing-mode: vertical-rl; white-space: nowrap; font-family: var(--head); font-size: 10px; letter-spacing: -.2px; color: #fff; text-shadow: 0 2px 0 rgba(60, 0, 60, .5); line-height: 1.25; }
+.wheel .hub { position: absolute; left: 50%; top: 50%; width: 54px; height: 54px; margin: -27px 0 0 -27px; border-radius: 50%; display: grid; place-items: center; font-size: 26px; color: #ff3d9a; background: var(--candy-shine), radial-gradient(#fff, #ffe0f0); box-shadow: 0 0 0 4px #ff3d9a; }
+.wheel-wrap .pointer { position: absolute; top: -4px; left: 50%; margin-left: -16px; width: 0; height: 0; border: 16px solid transparent; border-top: 30px solid #ffe14d; filter: drop-shadow(0 3px 0 #b85a00); z-index: 2; }
+.bulbs { position: absolute; inset: 0; }
+.bulbs i { position: absolute; left: 50%; top: 50%; width: 12px; height: 12px; margin: -6px; border-radius: 50%; background: #fff7b0; box-shadow: 0 0 10px #ffe14d; animation: bulb .8s steps(1) infinite; }
+@keyframes bulb { 50% { background: #ff9ad1; box-shadow: 0 0 10px #ff3d9a; } }
+.prize { font-family: var(--head); font-size: 22px; color: #ffe14d; text-shadow: 0 3px 0 #5a24c8; }
+/* Finale rockets */
+.rocket { position: fixed; left: 0; top: 0; margin: -14px 0 0 -14px; font-size: 28px; color: #fff; text-shadow: 0 0 12px #ffe14d, 0 0 24px #ff3d9a; z-index: 70; pointer-events: none; }

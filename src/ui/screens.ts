@@ -4,7 +4,9 @@ import { KIND_NAMES } from "../logic/cells"
 import type { LevelDef } from "../logic/level"
 import { svgUrl } from "../render/textures"
 import type { SaveData } from "../save"
-import { enterScreen, leaveScreen } from "./anim"
+import { gsap } from "gsap"
+import { WHEEL, type BoosterKind, type Boosters } from "../logic/bonus"
+import { enterScreen, leaveScreen, sparkleBurst } from "./anim"
 import { fakeIcon } from "./icons"
 import { el, esc, highlight } from "./text"
 
@@ -93,7 +95,17 @@ export function showMap(root: HTMLElement, save: SaveData, chapters: Chapter[], 
   })
 }
 
-export function showIntro(root: HTMLElement, def: LevelDef): Promise<void> {
+const BOOSTER_UI: Record<BoosterKind, { icon: string; label: string }> = {
+  row: { icon: "fx-row", label: "2FA" }, notify: { icon: "fx-notify", label: "Сповіщення" },
+  kep: { icon: "fx-kep", label: "КЕП" }, moves: { icon: "", label: "+3 ходи" },
+}
+
+/** Level intro; owned boosters are toggle chips. Resolves with the picks. */
+export function showIntro(root: HTMLElement, def: LevelDef, boosters?: Boosters): Promise<BoosterKind[]> {
+  const owned = boosters ? (Object.keys(BOOSTER_UI) as BoosterKind[]).filter((k) => boosters[k] > 0) : []
+  const chips = owned.map((k) => `<button class="booster" data-b="${k}">
+      ${BOOSTER_UI[k].icon ? `<img src="${svgUrl(BOOSTER_UI[k].icon)}" alt="">` : `<b class="plus">+3</b>`}
+      <span>${BOOSTER_UI[k].label}</span><i>${boosters![k]}</i></button>`).join("")
   const goals = def.goals.map((g) => {
     const icon = g.type === "fakes" ? fakeIcon(def) : KIND_NAMES[g.kind]
     const label = g.type === "fakes" ? "погасити фейки" : "зібрати"
@@ -105,8 +117,56 @@ export function showIntro(root: HTMLElement, def: LevelDef): Promise<void> {
     <p>За ${def.moves} ходів</p>
     ${chek()}
     <div class="say">${esc(def.hint)}</div>
+    ${chips ? `<div class="boosters"><small>Бустери в бій (натисни, щоб узяти):</small><div class="row">${chips}</div></div>` : ""}
     <button class="big gold" data-go>Грати!</button>`, (s, done) => {
-    s.querySelector<HTMLButtonElement>("[data-go]")!.onclick = () => done(undefined)
+    const picks = new Set<BoosterKind>()
+    s.querySelectorAll<HTMLButtonElement>("[data-b]").forEach((b) => (b.onclick = () => {
+      const k = b.dataset.b as BoosterKind
+      if (picks.has(k)) picks.delete(k); else picks.add(k)
+      b.classList.toggle("on", picks.has(k))
+    }))
+    s.querySelector<HTMLButtonElement>("[data-go]")!.onclick = () => done([...picks])
+  })
+}
+
+/** Casino fortune wheel: spins to `index` and shows the prize. */
+export function showWheel(root: HTMLElement, index: number): Promise<void> {
+  const n = WHEEL.length, step = 360 / n
+  const colors = ["#ff5c9a", "#7ab8ff", "#ffe14d", "#5ff2b6", "#c77aff", "#ffa95c", "#ff9ad1", "#ffd21f"]
+  const conic = WHEEL.map((_, i) => `${colors[i % colors.length]} ${i * step}deg ${(i + 1) * step}deg`).join(",")
+  const labels = WHEEL.map((w, i) => `<div class="seg" style="transform:rotate(${i * step + step / 2}deg)"><span>${w.prize === "jackpot" ? "💰 " : w.prize === "moves" ? "➕ " : "✦ "}${esc(w.label)}</span></div>`).join("")
+  const bulbs = Array.from({ length: 16 }, (_, i) => `<i style="transform:rotate(${i * 22.5}deg) translateY(-148px);animation-delay:${(i % 2) * 0.4}s"></i>`).join("")
+  return screen(root, `
+    <h1>Колесо фортуни</h1>
+    <p>Перемога! Крути — і виграй бустер на наступний бій.</p>
+    <div class="wheel-wrap"><div class="pointer"></div><div class="bulbs">${bulbs}</div>
+      <div class="wheel" style="background:conic-gradient(${conic})">${labels}<div class="hub">✦</div></div></div>
+    <button class="big gold" data-spin>🎰 Крутити!</button>
+    <div class="prize" hidden></div>`, (s, done) => {
+    const wheel = s.querySelector<HTMLElement>(".wheel")!
+    const btn = s.querySelector<HTMLButtonElement>("[data-spin]")!
+    btn.onclick = () => {
+      btn.disabled = true
+      const target = 360 * 6 + (360 - (index * step + step / 2))
+      let last = 0
+      gsap.to(wheel, {
+        rotation: target, duration: 4.2, ease: "power4.out",
+        onUpdate: () => { const seg = Math.floor((gsap.getProperty(wheel, "rotation") as number) / step); if (seg !== last) { last = seg; sfx.tick() } },
+        onComplete: () => {
+          const w = WHEEL[index]
+          sfx.win()
+          const prize = s.querySelector<HTMLElement>(".prize")!
+          prize.hidden = false
+          prize.innerHTML = `<b>${w.prize === "jackpot" ? "💰 ДЖЕКПОТ! Усі бустери!" : "Виграш: " + esc(w.label) + "!"}</b>`
+          gsap.fromTo(prize, { scale: 0.3, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.6, ease: "elastic.out(1, 0.5)" })
+          const r = wheel.getBoundingClientRect()
+          sparkleBurst(r.left + r.width / 2, r.top + r.height / 2, 40, 220)
+          btn.textContent = "Забрати ✦"
+          btn.disabled = false
+          btn.onclick = () => done(undefined)
+        },
+      })
+    }
   })
 }
 
