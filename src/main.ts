@@ -50,6 +50,7 @@ async function boot() {
   app.ticker.add((t) => {
     fx.update((t.deltaMS / 1000) * gsap.globalTimeline.timeScale(), performance.now())
     fx.twinkle(performance.now())
+    view.animateSheen(t.deltaMS / 1000, performance.now())
     quality.sample(t.deltaMS)
     if (!clock.active || clock.paused || clock.up) return
     clock.left = Math.max(0, clock.left - t.deltaMS / 1000)

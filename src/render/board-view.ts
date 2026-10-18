@@ -1,5 +1,7 @@
 import { gsap } from "gsap"
-import { Container, Graphics, Rectangle, Sprite, type FederatedPointerEvent, type Texture } from "pixi.js"
+import { ColorMatrixFilter, Container, FillGradient, Graphics, Rectangle, Sprite, TilingSprite, type FederatedPointerEvent, type Texture } from "pixi.js"
+import { quality } from "../fx/quality"
+import { makeGlitterTexture } from "./glitter"
 import { isFake, isTile, type Cell } from "../logic/cells"
 import { areNeighbors, rc, type Grid } from "../logic/grid"
 import type { Board, Step } from "../logic/resolve"
@@ -73,6 +75,15 @@ export class BoardView extends Container {
   private cells: (Cell | null)[] = []
   private sprites = new Map<number, TileSprite>()
   private slots = new Graphics()
+  // Cell backgrounds: sugar glitter with a slow rainbow shift and a passing
+  // light band, all clipped to the rounded cells.
+  private sheen = new Container()
+  private sheenMask = new Graphics()
+  private glitter = new TilingSprite({ texture: makeGlitterTexture(96, Math.min(devicePixelRatio, 2)), width: 1, height: 1 })
+  private band = new Graphics()
+  private iris = new Graphics()
+  private hue = new ColorMatrixFilter()
+  private bandT = -1
   private layer = new Container()
   private maskG = new Graphics()
   private selected = -1
@@ -80,13 +91,37 @@ export class BoardView extends Container {
 
   constructor(private tex: Record<string, Texture>, private g: Grid) {
     super()
-    this.addChild(this.slots, this.layer, this.maskG)
+    this.glitter.alpha = 0.75
+    this.band.blendMode = "add"
+    this.iris.alpha = 0.22
+    this.sheen.addChild(this.iris, this.glitter, this.band)
+    this.sheen.mask = this.sheenMask
+    this.addChild(this.slots, this.sheen, this.sheenMask, this.layer, this.maskG)
     this.layer.mask = this.maskG
     this.eventMode = "static"
     this.on("pointerdown", (e) => this.down(e))
     this.on("pointermove", (e) => this.move(e))
     this.on("pointerup", () => (this.press = null))
     this.on("pointerupoutside", () => (this.press = null))
+  }
+
+  /** Per-frame shimmer of the cell backgrounds: glitter drifts, its colours
+   * slowly cycle (iridescence) and a light band sweeps across every ~6 s. */
+  animateSheen(dt: number, now: number) {
+    if (quality.reducedMotion) return
+    this.glitter.tilePosition.x += dt * 5
+    this.glitter.tilePosition.y += dt * 2.5
+    if (quality.heavy) {
+      this.hue.hue((now / 1000) * 40 % 360, false)
+      if (this.sheen.filters?.[0] !== this.hue) this.sheen.filters = [this.hue]
+    } else if (this.sheen.filters?.length) this.sheen.filters = []
+    const w = this.g.w * this.cell
+    if (this.bandT < 0 && Math.random() < dt / 6) this.bandT = 0
+    if (this.bandT >= 0) {
+      this.bandT += dt / 1.4
+      this.band.x = -this.cell * 3 + (w + this.cell * 6) * this.bandT
+      if (this.bandT >= 1) { this.bandT = -1; this.band.x = -this.cell * 3 }
+    }
   }
 
   /** Sprites currently showing fakes (for idle glitch effects). */
@@ -115,6 +150,27 @@ export class BoardView extends Container {
         .stroke({ color: 0xffc8f0, alpha: 0.18, width: 2 })
       this.slots.roundRect(x + s * 0.14, y + s * 0.07, s * 0.72, s * 0.13, s * 0.07).fill({ color: 0xffffff, alpha: 0.09 })
     }
+    this.sheenMask.clear()
+    for (let i = 0; i < this.g.w * this.g.h; i++) {
+      const { r, c } = rc(this.g, i)
+      this.sheenMask.roundRect(c * cell + 3, r * cell + 3, cell - 6, cell - 6, cell * 0.26).fill(0xffffff)
+    }
+    this.glitter.width = w
+    this.glitter.height = h
+    // Rainbow under the glitter: the hue filter makes it flow (iridescence).
+    const rainbow = new FillGradient({ type: "linear", start: { x: 0, y: 0 }, end: { x: 1, y: 1 }, colorStops: [
+      { offset: 0, color: "#ff7ab8" }, { offset: 0.25, color: "#ffe14d" }, { offset: 0.5, color: "#5ff2b6" },
+      { offset: 0.75, color: "#7ab8ff" }, { offset: 1, color: "#c77aff" },
+    ] })
+    this.iris.clear().rect(0, 0, w, h).fill(rainbow)
+    const grad = new FillGradient({ type: "linear", start: { x: 0, y: 0 }, end: { x: 1, y: 0 }, colorStops: [
+      { offset: 0, color: "rgba(255,255,255,0)" }, { offset: 0.5, color: "rgba(255,240,250,0.45)" }, { offset: 1, color: "rgba(255,255,255,0)" },
+    ] })
+    this.band.clear().rect(0, 0, cell * 1.6, h * 1.6).fill(grad)
+    this.band.pivot.set(cell * 0.8, h * 0.8)
+    this.band.rotation = 0.35
+    this.band.y = h / 2
+    this.band.x = -cell * 3
     this.maskG.clear().rect(-cell, -cell * 0.35, w + 2 * cell, h + cell * 1.35).fill(0xffffff)
     for (const [, s] of this.sprites) s.setCell(s.cell, cell)
     this.cells.forEach((c, i) => { if (c) { const s = this.sprites.get(c.id)!; const p = this.pos(i); s.position.set(p.x, p.y) } })

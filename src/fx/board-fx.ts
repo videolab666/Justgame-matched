@@ -44,7 +44,7 @@ export class BoardEffects implements BoardFx {
   /** A tiny star sparkles on a random tile now and then (the "glitter" in candy). */
   twinkle(now: number) {
     if (now < this.twinkleAt || quality.reducedMotion) return
-    this.twinkleAt = now + (quality.heavy ? 160 : 420)
+    this.twinkleAt = now + 1400 + Math.random() * 1600
     const c = this.view.cell
     const x = (Math.floor(Math.random() * 7) + 0.2 + Math.random() * 0.6) * c
     const y = (Math.floor(Math.random() * 8) + 0.15 + Math.random() * 0.5) * c
@@ -52,10 +52,10 @@ export class BoardEffects implements BoardFx {
     s.anchor.set(0.5)
     s.position.set(x, y)
     s.blendMode = "add"
-    s.tint = [0xffffff, 0xfff3b0, 0xffd6f0, 0xd6f3ff][Math.floor(Math.random() * 4)]
+    s.tint = 0xffffff
     s.scale.set(0)
     this.layer.addChild(s)
-    const size = (c / 64) * (0.35 + Math.random() * 0.35)
+    const size = (c / 64) * (0.14 + Math.random() * 0.1)
     gsap.timeline({ onComplete: () => s.destroy() })
       .to(s.scale, { x: size, y: size, duration: 0.22, ease: "back.out(3)" })
       .to(s, { rotation: 0.8, duration: 0.5, ease: "none" }, 0)

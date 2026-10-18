@@ -11,7 +11,7 @@
 <feOffset in="bl" dx="0" dy="-3" result="up"/>
 <feComposite in="SourceAlpha" in2="up" operator="out" result="rim"/>
 <feFlood flood-color="#ffffff" flood-opacity=".55"/><feComposite in2="rim" operator="in" result="rimlight"/>
-<feMerge><feMergeNode in="SourceGraphic"/><feMergeNode in="rimlight"/><feMergeNode in="spb"/><feMergeNode in="spm"/></feMerge>
+<feMerge><feMergeNode in="SourceGraphic"/><feMergeNode in="rimlight"/></feMerge>
 </filter>
 <radialGradient id="r" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#ffc2d6"/><stop offset=".45" stop-color="#ff3d7f"/><stop offset="1" stop-color="#a3003f"/></radialGradient>
 <linearGradient id="w" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#e6a067"/><stop offset=".5" stop-color="#ffd9a8"/><stop offset="1" stop-color="#b8692c"/></linearGradient></defs>

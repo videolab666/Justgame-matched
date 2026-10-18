@@ -11,7 +11,7 @@
 <feOffset in="bl" dx="0" dy="-3" result="up"/>
 <feComposite in="SourceAlpha" in2="up" operator="out" result="rim"/>
 <feFlood flood-color="#ffffff" flood-opacity=".55"/><feComposite in2="rim" operator="in" result="rimlight"/>
-<feMerge><feMergeNode in="SourceGraphic"/><feMergeNode in="rimlight"/><feMergeNode in="spb"/><feMergeNode in="spm"/></feMerge>
+<feMerge><feMergeNode in="SourceGraphic"/><feMergeNode in="rimlight"/></feMerge>
 </filter>
 <radialGradient id="c" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#ffa6ee"/><stop offset=".5" stop-color="#d4148f"/><stop offset="1" stop-color="#4a0647"/></radialGradient></defs>
 <ellipse cx="64" cy="118" rx="44" ry="6" fill="#2a0b4f" opacity=".35"/><g filter="url(#gl)">
