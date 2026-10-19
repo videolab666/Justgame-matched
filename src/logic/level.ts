@@ -4,7 +4,7 @@ import { hopCalls, spreadFake } from "./fakes"
 import { generateBoard, hasValidMove, shuffleBoard, type FakeSeed } from "./generate"
 import type { Grid } from "./grid"
 import { fireSpecialAt, resolveSwap, type Board, type Rules, type Step } from "./resolve"
-import { makeRng } from "./rng"
+import { makeRng, type Rng } from "./rng"
 
 export const BOARD: Grid = { w: 7, h: 8 }
 
@@ -43,6 +43,8 @@ export type MoveResult = {
   infected?: { from: number; to: number }
   hops?: { from: number; to: number }[]
   shuffled?: Record<number, number>
+  /** Cells that became fresh fakes so the fake goal stays reachable. */
+  reinforced?: number[]
   interruptDue: boolean
 }
 
@@ -115,6 +117,18 @@ export function applyMove(s: LevelState, a: number, b: number): MoveResult {
     state = { ...state, board: h.board }
     if (h.hops.length) hops = h.hops
   }
+  // Fake goals ask for more fakes than start on the board; spreading tops
+  // them up, but a fast player can wipe them all out. Keep the goal
+  // reachable: one new fake per move while too few are left (not on a move
+  // that already spread, so the pace stays at most +1 fake per move).
+  let reinforced: MoveResult["reinforced"]
+  const need = fakesNeeded(state)
+  if (need > 0 && !infected && state.board.cells.filter(isFake).length < need) {
+    const types = s.def.initialFakes.map((f) => f.fake)
+    const sp = spawnFakes(state.board, rng, 1, () => (types.length ? types[rng.int(types.length)] : "sms"))
+    state = { ...state, board: sp.board }
+    if (sp.infected.length) reinforced = sp.infected
+  }
   let shuffled: MoveResult["shuffled"]
   if (!hasValidMove(state.board)) {
     const sh = shuffleBoard(state.board, rng)
@@ -123,7 +137,7 @@ export function applyMove(s: LevelState, a: number, b: number): MoveResult {
   }
   state = finish({ ...state, rngState: rng.state() })
   const interruptDue = state.status === "playing" && s.def.interruptEvery > 0 && state.moveCount % s.def.interruptEvery === 0
-  return { state, steps, infected, hops, shuffled, interruptDue }
+  return { state, steps, infected, hops, shuffled, interruptDue, reinforced }
 }
 
 /** «Кіберполіція» booster: turns the tile at `index` into a police special
@@ -145,19 +159,32 @@ export function addFakes(s: LevelState, n: number): { state: LevelState; infecte
   const counts = new Map<FakeType, number>()
   for (const c of s.board.cells) if (isFake(c)) counts.set(c.fake, (counts.get(c.fake) ?? 0) + 1)
   const type: FakeType = [...counts.entries()].sort((p, q) => q[1] - p[1])[0]?.[0] ?? "sms"
-  const cells = s.board.cells.slice()
-  let nextId = s.board.nextId
+  const { board, infected } = spawnFakes(s.board, rng, n, () => type)
+  return { state: { ...s, board, rngState: rng.state() }, infected }
+}
+
+/** Fakes the unfinished fake goal still needs (0 if none). */
+function fakesNeeded(s: LevelState): number {
+  const k = s.def.goals.findIndex((g) => g.type === "fakes")
+  return k < 0 ? 0 : Math.max(0, s.def.goals[k].n - s.progress[k])
+}
+
+/** Turns `n` random plain tiles into fakes of `typeOf()`. */
+function spawnFakes(b: Board, rng: Rng, n: number, typeOf: () => FakeType): { board: Board; infected: number[] } {
+  const cells = b.cells.slice()
+  let nextId = b.nextId
   const plain = cells.map((c, i) => (isTile(c) && !c.special ? i : -1)).filter((i) => i >= 0)
   const infected: number[] = []
   for (let k = 0; k < n && plain.length; k++) {
     const i = plain.splice(rng.int(plain.length), 1)[0]
     const victim = cells[i]
+    const type = typeOf()
     cells[i] = type === "forgery" && isTile(victim)
       ? { t: "fake", fake: "forgery", hp: FAKE_HP.forgery, id: nextId++, disguise: victim.kind, revealed: false }
       : { t: "fake", fake: type, hp: FAKE_HP[type], id: nextId++ }
     infected.push(i)
   }
-  return { state: { ...s, board: { ...s.board, cells, nextId }, rngState: rng.state() }, infected }
+  return { board: { ...b, cells, nextId }, infected }
 }
 
 export const addMoves = (s: LevelState, n: number): LevelState => ({ ...s, movesLeft: s.movesLeft + n })

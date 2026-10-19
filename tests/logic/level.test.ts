@@ -50,6 +50,19 @@ describe("spreading and interrupts", () => {
     const kill = on(ROWS, { goals: [{ type: "fakes", n: 99 }] })
     expect(applyMove(kill, 2, 3).infected).toBeUndefined()
   })
+  test("fakes are topped up when fewer remain than the goal still needs", () => {
+    const s = on(ROWS, { goals: [{ type: "fakes", n: 3 }], initialFakes: [{ index: 7, fake: "ad", hp: 2 }] })
+    const r = applyMove(s, 2, 3)                     // kills the only fake
+    expect(r.state.progress[0]).toBe(1)
+    const left = r.state.board.cells.filter(isFake)
+    expect(left.length).toBe(1)
+    expect(left[0].fake).toBe("ad")                  // type from the level's own set
+    expect(r.reinforced).toHaveLength(1)
+  })
+  test("no top-up once enough fakes are on the board", () => {
+    const s = on(ROWS, { goals: [{ type: "fakes", n: 1 }, { type: "collect", kind: 5, n: 99 }] })
+    expect(applyMove(s, 2, 3).state.board.cells.filter(isFake).length).toBe(0)
+  })
   test("an interrupt is due every interruptEvery moves", () => {
     const s = { ...on(ROWS, { goals: [{ type: "fakes", n: 99 }], interruptEvery: 1 }) }
     expect(applyMove(s, 2, 3).interruptDue).toBe(true)
